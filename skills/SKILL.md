@@ -114,3 +114,58 @@ node cli.js --run text2image-example outputs \
 | "Tag @xyz is ambiguous" | Each `@tag` must be unique within a workflow |
 | Timeout | Increase `COMFYUI_TIMEOUT_MS` or check server load |
 | "Value not in list" | Run `--describe` to see valid values from server |
+
+---
+
+## Workflow Ingestion Guidelines
+
+When onboarding new ComfyUI API workflows into this repository, follow these guidelines to ensure workflows are normalized and ready for automation/agent usage.
+
+### 1. Export Requirements
+
+- Export workflows using ComfyUI's **"Save (API Format)"** option
+- File naming convention: `workflows/<descriptive-name>-api.json`
+
+### 2. Required Tagging Contract
+
+Every workflow must have these tagged nodes:
+
+- **@save** (mandatory) - Tag the node that saves the final output image (typically a SaveImage node)
+  ```json
+  "_meta": {
+    "title": "@save Final Image"
+  }
+  ```
+
+Recommended tags for better usability:
+- **@prompt** - CLIPTextEncode node for positive prompts
+- **@negative** - CLIPTextEncode node for negative prompts
+- **@ksampler** - KSampler or KSamplerAdvanced node
+- **@checkpoint** - CheckpointLoaderSimple node
+- **@lora** - LoraLoader node (if applicable)
+
+### 3. Validation Steps
+
+Before committing a new workflow:
+
+1. Run `node cli.js --describe <workflow>` to verify tags are detected
+2. Check that the @save tag is present and correctly identified
+3. Ensure all required parameters are editable (not marked as "linked")
+
+Example validation output:
+```bash
+$ node cli.js --describe my-new-workflow
+Workflow: my-new-workflow
+Tags:
+  @save (node 19) [SaveImage] - editable
+  @prompt (node 6) [CLIPTextEncode] - editable
+  @negative (node 7) [CLIPTextEncode] - editable
+  @ksampler (node 10) [KSamplerAdvanced] - editable
+```
+
+### 4. Tagging Best Practices
+
+- Use descriptive prefixes in titles: "@save Final Image" vs "@save"
+- Ensure each @tag is unique within a workflow
+- Place tags at the beginning of the title for clarity
+- Maintain consistency with existing workflows in the repository
