@@ -1,0 +1,101 @@
+{
+  "version": "0.1.0",
+  "workflow": "sdxl-refiner",
+  "input_map": {
+    "prompts": [
+      {
+        "role": "positive",
+        "tag": null,
+        "node_id": "6",
+        "field": "text",
+        "description": "Base model positive prompt (CLIPTextEncode)"
+      },
+      {
+        "role": "positive",
+        "tag": null,
+        "node_id": "15",
+        "field": "text",
+        "description": "Refiner positive prompt (CLIPTextEncode) — must match node 6"
+      },
+      {
+        "role": "negative",
+        "tag": null,
+        "node_id": "7",
+        "field": "text",
+        "description": "Base model negative prompt"
+      },
+      {
+        "role": "negative",
+        "tag": null,
+        "node_id": "16",
+        "field": "text",
+        "description": "Refiner negative prompt — must match node 7"
+      }
+    ],
+    "models": [
+      {
+        "role": "base",
+        "tag": "@checkpoint",
+        "node_id": "4",
+        "field": "ckpt_name",
+        "description": "SDXL base checkpoint"
+      },
+      {
+        "role": "refiner",
+        "tag": null,
+        "node_id": "12",
+        "field": "ckpt_name",
+        "description": "SDXL refiner checkpoint"
+      }
+    ],
+    "sampler": [
+      {
+        "tag": null,
+        "node_id": "10",
+        "role": "base",
+        "fields": {
+          "noise_seed": { "type": "int", "description": "Random seed" },
+          "steps": { "type": "int", "range": [1, 150], "description": "Total sampling steps (base + refiner)" },
+          "cfg": { "type": "float", "range": [1.0, 30.0], "description": "CFG scale" },
+          "sampler_name": { "type": "enum", "description": "Sampler algorithm" },
+          "scheduler": { "type": "enum", "description": "Noise scheduler" },
+          "start_at_step": { "type": "int", "description": "Base start step" },
+          "end_at_step": { "type": "int", "description": "Base end step (refiner takes over)" }
+        }
+      },
+      {
+        "tag": null,
+        "node_id": "11",
+        "role": "refiner",
+        "fields": {
+          "steps": { "type": "int", "description": "Must match base steps" },
+          "cfg": { "type": "float", "description": "Refiner CFG" },
+          "start_at_step": { "type": "int", "description": "Refiner start (should match base end_at_step)" },
+          "end_at_step": { "type": "int", "description": "Refiner end step" }
+        }
+      }
+    ],
+    "latent": [
+      {
+        "node_id": "5",
+        "fields": {
+          "width": { "type": "int", "description": "Image width (recommended: 1024)" },
+          "height": { "type": "int", "description": "Image height (recommended: 1024)" },
+          "batch_size": { "type": "int", "description": "Number of images per run" }
+        }
+      }
+    ],
+    "other": []
+  },
+  "output_map": {
+    "save_nodes": [
+      {
+        "tag": "@save",
+        "node_id": "19",
+        "field": "filename_prefix",
+        "description": "Output image save node"
+      }
+    ],
+    "artifact_path": "ComfyUI/output/{filename_prefix}_{counter}.png"
+  }
+}
