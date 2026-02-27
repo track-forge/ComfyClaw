@@ -526,5 +526,14 @@
     "_meta": {
       "title": "Preview Image"
     }
+  },
+  "86": {
+    "inputs": {
+      "filename_prefix": "victorian-output"
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "@save Victorian Final Image"
+    }
   }
 }

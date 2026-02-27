@@ -135,7 +135,9 @@
           ]
         }
       ],
-      "title": "@checkpoint",
+      "_meta": {
+        "title": "@checkpoint Checkpoint Loader"
+      },
       "properties": {
         "cnr_id": "comfy-core",
         "ver": "0.14.1",
@@ -181,7 +183,9 @@
           ]
         }
       ],
-      "title": "@prompt",
+      "_meta": {
+        "title": "@prompt CLIP Text Encode (Prompt)"
+      },
       "properties": {
         "cnr_id": "comfy-core",
         "ver": "0.14.1",
@@ -227,7 +231,9 @@
           ]
         }
       ],
-      "title": "@negative",
+      "_meta": {
+        "title": "@negative CLIP Text Encode (Negative)"
+      },
       "properties": {
         "cnr_id": "comfy-core",
         "ver": "0.14.1",
@@ -288,7 +294,9 @@
           ]
         }
       ],
-      "title": "@ksampler",
+      "_meta": {
+        "title": "@ksampler KSampler"
+      },
       "properties": {
         "cnr_id": "comfy-core",
         "ver": "0.14.1",
@@ -331,7 +339,9 @@
         }
       ],
       "outputs": [],
-      "title": "@save",
+      "_meta": {
+        "title": "@save Save Image"
+      },
       "properties": {
         "cnr_id": "comfy-core",
         "ver": "0.14.1",

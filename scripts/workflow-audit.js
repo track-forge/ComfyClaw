@@ -40,10 +40,21 @@ for (const file of workflowFiles) {
     const saveNodes = [];
     const tags = {};
     
-    for (const [nodeId, node] of Object.entries(workflowData)) {
-      if (node._meta && node._meta.title) {
-        const title = node._meta.title;
-        
+    // Handle both API format (object with node IDs as keys) and legacy format (nodes array)
+    let nodesToCheck = [];
+    if (Array.isArray(workflowData.nodes)) {
+      // Legacy format: { nodes: [...] }
+      nodesToCheck = workflowData.nodes.map((node, index) => [node.id, node]);
+    } else {
+      // API format: { "1": {...}, "2": {...} }
+      nodesToCheck = Object.entries(workflowData);
+    }
+    
+    for (const [nodeId, node] of nodesToCheck) {
+      // Handle both _meta.title (API format) and title (legacy format)
+      const title = (node._meta && node._meta.title) || node.title;
+      
+      if (title) {
         // Check for @save tag
         if (title.includes('@save')) {
           saveNodes.push({ id: nodeId, title });
