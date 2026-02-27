@@ -1,0 +1,41 @@
+{
+  "name": "SDXL + Refiner",
+  "version": "0.1.0",
+  "purpose": "Two-pass SDXL generation: base model renders the composition, refiner pass adds detail and coherence.",
+  "style": ["photorealistic", "cinematic", "analogue"],
+  "use_cases": ["general-purpose", "landscape", "portrait", "concept-art"],
+  "models": {
+    "base": {
+      "architecture": "sdxl",
+      "recommended": ["juggernautXL_v9Rundiffusionphoto2.safetensors"],
+      "compatible": [
+        "juggernautXL_v8Rundiffusion.safetensors",
+        "juggernautXL_v7Rundiffusion.safetensors",
+        "dreamshaperXL_turboDpmppSDE.safetensors",
+        "realvisxlV40_v40Bakedvae.safetensors",
+        "CHEYENNE_v16VAEBaked.safetensors",
+        "juggernaut_aftermath.safetensors"
+      ]
+    },
+    "refiner": {
+      "architecture": "sdxl",
+      "recommended": ["SDXL/sd_xl_refiner_1.0.safetensors"]
+    },
+    "loras": []
+  },
+  "resolution": {
+    "default": [1024, 1024],
+    "recommended": [[1024, 1024], [1152, 896], [896, 1152]]
+  },
+  "estimated_time_seconds": 7,
+  "vram_minimum_gb": 10,
+  "caveats": [
+    "Refiner uses separate CLIP encode — both positive prompts (nodes 6 and 15) must be updated together",
+    "Base runs steps 0-20, refiner runs 20-25 — adjusting step split changes style balance"
+  ],
+  "context": {
+    "summary": "Best all-around workflow for high-quality photorealistic and cinematic images. Two-pass process with SDXL base + refiner produces sharp, coherent results.",
+    "prompt_guidance": "Works great with descriptive photography-style prompts. Include lighting, mood, camera/film references. Juggernaut excels at realism and human subjects.",
+    "caution": "Remember to set BOTH positive prompt nodes (6 and 15) to the same text, or base and refiner will diverge."
+  }
+}

@@ -1,0 +1,68 @@
+{
+  "version": "0.1.0",
+  "workflow": "text2image-example",
+  "input_map": {
+    "prompts": [
+      {
+        "role": "positive",
+        "tag": "@prompt",
+        "node_id": "6",
+        "field": "text",
+        "description": "Positive prompt"
+      },
+      {
+        "role": "negative",
+        "tag": "@negative",
+        "node_id": "7",
+        "field": "text",
+        "description": "Negative prompt"
+      }
+    ],
+    "models": [
+      {
+        "role": "base",
+        "tag": "@checkpoint",
+        "node_id": "4",
+        "field": "ckpt_name",
+        "description": "SD 1.5 checkpoint"
+      }
+    ],
+    "sampler": [
+      {
+        "tag": "@ksampler",
+        "node_id": "3",
+        "role": "base",
+        "fields": {
+          "seed": { "type": "int", "description": "Random seed" },
+          "steps": { "type": "int", "range": [1, 150], "description": "Sampling steps" },
+          "cfg": { "type": "float", "range": [1.0, 30.0], "description": "CFG scale" },
+          "sampler_name": { "type": "enum", "description": "Sampler algorithm" },
+          "scheduler": { "type": "enum", "description": "Noise scheduler" },
+          "denoise": { "type": "float", "range": [0.0, 1.0], "description": "Denoise strength" }
+        }
+      }
+    ],
+    "latent": [
+      {
+        "node_id": "5",
+        "fields": {
+          "width": { "type": "int", "description": "Image width (recommended: 512)" },
+          "height": { "type": "int", "description": "Image height (recommended: 512)" },
+          "batch_size": { "type": "int", "description": "Number of images per run" }
+        }
+      }
+    ],
+    "other": []
+  },
+  "output_map": {
+    "save_nodes": [
+      {
+        "tag": "@save",
+        "node_id": "9",
+        "field": "filename_prefix",
+        "description": "Output image save node"
+      }
+    ],
+    "artifact_path": "ComfyUI/output/{filename_prefix}_{counter}.png"
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "name": "Text2Image Basic (SD 1.5)",
+  "version": "0.1.0",
+  "purpose": "Simple single-pass text-to-image generation using Stable Diffusion 1.5. Fast, lightweight, good for quick iterations.",
+  "style": ["illustrative", "general"],
+  "use_cases": ["general-purpose", "quick-iteration", "concept-sketch"],
+  "models": {
+    "base": {
+      "architecture": "sd15",
+      "recommended": ["v1-5-pruned-emaonly.safetensors"],
+      "compatible": ["v1-5-pruned-emaonly-fp16.safetensors"]
+    },
+    "loras": []
+  },
+  "resolution": {
+    "default": [512, 512],
+    "recommended": [[512, 512], [512, 768], [768, 512]]
+  },
+  "estimated_time_seconds": 3,
+  "vram_minimum_gb": 4,
+  "caveats": [
+    "SD 1.5 quality is lower than SDXL — use for speed, not final output",
+    "512x512 native resolution — higher res may produce artifacts without hires fix"
+  ],
+  "context": {
+    "summary": "Fastest workflow available. Single KSampler pass with SD 1.5. Best for rapid prototyping and testing prompts before running through the SDXL refiner pipeline.",
+    "prompt_guidance": "Keep prompts concise. SD 1.5 responds well to comma-separated tag-style prompts. Quality boosters like 'masterpiece, best quality' help.",
+    "caution": "Don't expect SDXL-level quality. Use this for speed, then upgrade to sdxl-refiner for final output."
+  }
+}
