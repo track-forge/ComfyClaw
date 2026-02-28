@@ -104,6 +104,51 @@ node cli.js --run text2image-example outputs \
 
 ---
 
+## 4. Onboarding New Workflows
+
+When adding a new ComfyUI workflow to the repo:
+
+### Requirements
+1. **Export as API format** from ComfyUI ("Save (API Format)")
+2. **Name:** `workflows/<name>-api.json`
+3. **Tag nodes** with `@tags` in `_meta.title`:
+   - **Required:** `@save` (on the SaveImage node — output detection depends on this)
+   - **Recommended:** `@prompt`, `@negative`, `@ksampler`, `@checkpoint`, `@lora`, `@size`
+4. **Each `@tag` must be unique** within a workflow (no duplicates)
+
+### Tag Contract
+
+| Tag | Node Type | Purpose |
+|-----|-----------|---------|
+| `@save` | SaveImage | **Required.** Output file detection |
+| `@prompt` | CLIPTextEncode | Positive prompt override |
+| `@negative` | CLIPTextEncode | Negative prompt override |
+| `@ksampler` | KSampler / KSamplerAdvanced | Sampler controls (seed, steps, cfg) |
+| `@checkpoint` | CheckpointLoaderSimple | Model selection |
+| `@lora` | LoraLoader | LoRA selection + strength |
+| `@size` | EmptyLatentImage | Resolution controls |
+
+### Audit Script
+
+Run the audit to check all workflows for compliance:
+
+```bash
+node scripts/workflow-audit.js [workflow-dir]
+```
+
+- Checks required tags (`@save`)
+- Warns on missing recommended tags
+- Detects duplicate tags, broken node references, untagged SaveImage nodes
+- Suggests tags for untagged nodes based on `class_type` heuristics
+
+### Companion Files (optional but recommended)
+
+For each workflow, add metadata and mapping files:
+- `workflows/<name>-api.meta.json` — purpose, style, model compatibility, agent context (see `spec/workflow-metadata-schema.md`)
+- `workflows/<name>-api.map.json` — input/output mapping for programmatic control (see `spec/workflow-mapping-schema.md`)
+
+---
+
 ## Troubleshooting
 
 | Problem | Solution |
