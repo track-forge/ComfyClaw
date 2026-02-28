@@ -1,0 +1,12 @@
+{
+  "1": {
+    "inputs": { "text": "hello", "clip": ["999", 0] },
+    "class_type": "CLIPTextEncode",
+    "_meta": { "title": "@prompt" }
+  },
+  "2": {
+    "inputs": { "filename_prefix": "out", "images": ["1", 0] },
+    "class_type": "SaveImage",
+    "_meta": { "title": "@save" }
+  }
+}

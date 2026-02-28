@@ -1,0 +1,40 @@
+{
+  "1": {
+    "inputs": { "ckpt_name": "model.safetensors" },
+    "class_type": "CheckpointLoaderSimple",
+    "_meta": { "title": "@checkpoint" }
+  },
+  "2": {
+    "inputs": { "text": "a cat", "clip": ["1", 1] },
+    "class_type": "CLIPTextEncode",
+    "_meta": { "title": "@prompt" }
+  },
+  "3": {
+    "inputs": { "text": "ugly", "clip": ["1", 1] },
+    "class_type": "CLIPTextEncode",
+    "_meta": { "title": "@negative" }
+  },
+  "4": {
+    "inputs": {
+      "seed": 42, "steps": 20, "cfg": 7, "sampler_name": "euler", "scheduler": "normal", "denoise": 1,
+      "model": ["1", 0], "positive": ["2", 0], "negative": ["3", 0], "latent_image": ["5", 0]
+    },
+    "class_type": "KSampler",
+    "_meta": { "title": "@ksampler" }
+  },
+  "5": {
+    "inputs": { "width": 512, "height": 512, "batch_size": 1 },
+    "class_type": "EmptyLatentImage",
+    "_meta": { "title": "Empty Latent Image" }
+  },
+  "6": {
+    "inputs": { "samples": ["4", 0], "vae": ["1", 2] },
+    "class_type": "VAEDecode",
+    "_meta": { "title": "VAE Decode" }
+  },
+  "7": {
+    "inputs": { "filename_prefix": "ComfyUI", "images": ["6", 0] },
+    "class_type": "SaveImage",
+    "_meta": { "title": "@save" }
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "1": {
+    "inputs": { "ckpt_name": "model.safetensors" },
+    "class_type": "CheckpointLoaderSimple",
+    "_meta": { "title": "@checkpoint" }
+  },
+  "2": {
+    "inputs": { "text": "a cat", "clip": ["1", 1] },
+    "class_type": "CLIPTextEncode",
+    "_meta": { "title": "@prompt" }
+  },
+  "3": {
+    "inputs": { "filename_prefix": "out", "images": ["2", 0] },
+    "class_type": "SaveImage",
+    "_meta": { "title": "Save Image" }
+  }
+}
