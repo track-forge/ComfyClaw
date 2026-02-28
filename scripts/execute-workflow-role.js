@@ -5,7 +5,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { execSync } = require('child_process');
+const { execFile } = require('child_process');
 
 // Constants
 const BASE_DIR = process.env.BASE_DIR || path.resolve(__dirname, '..');
@@ -38,52 +38,78 @@ function buildCliCommand(artifact) {
     }
 
     const args = [
-        'node', 'cli.js',
+        'cli.js',
         '--run', workflow
     ];
 
-    // Add overrides
+    // Add overrides with dot notation (@tag.field=value)
+    const overrideArgs = [];
     Object.entries(overrides).forEach(([tag, value]) => {
-        args.push('--set', `${tag}=${value}`);
+        // Convert flat tag to dot notation if needed
+        // e.g., @prompt -> @prompt.text, @ksampler -> @ksampler.steps
+        let formattedTag = tag;
+        if (tag === '@prompt' || tag === '@negative') {
+            formattedTag = `${tag}.text`;
+        } else if (tag === '@steps' || tag === '@seed') {
+            formattedTag = `@ksampler.${tag.substring(1)}`;
+        } else if (tag === '@checkpoint') {
+            formattedTag = `${tag}.name`;
+        }
+        overrideArgs.push('--set', `${formattedTag}=${value}`);
     });
 
-    // Add output directory
-    args.push('--output-dir', OUTPUTS_DIR);
+    // Add output directory as positional argument (must come after --run but before --set)
+    args.push(OUTPUTS_DIR);
+
+    // Add override arguments
+    args.push(...overrideArgs);
 
     return args;
 }
 
 /**
- * Execute ComfyClaw CLI command
+ * Execute ComfyClaw CLI command asynchronously
  * @param {Array<string>} command - Command arguments
- * @returns {Object} Execution result
+ * @returns {Promise<Object>} Execution result
  */
-function executeCommand(command) {
-    const cmdString = command.join(' ');
-    console.log(`Executing: ${cmdString}`);
+async function executeCommand(command) {
+    const [executable, ...args] = command;
+    console.log(`Executing: ${executable} ${args.join(' ')}`);
 
-    try {
-        const stdout = execSync(cmdString, {
+    return new Promise((resolve) => {
+        const child = execFile(executable, args, {
             cwd: BASE_DIR,
-            stdio: ['pipe', 'pipe', 'pipe'],
-            encoding: 'utf-8'
+            timeout: 60000 // 60 second timeout
+        }, (error, stdout, stderr) => {
+            if (error) {
+                resolve({
+                    success: false,
+                    stdout: stdout || '',
+                    stderr: stderr || error.message,
+                    timestamp: new Date().toISOString(),
+                    exitCode: error.code || 1
+                });
+            } else {
+                resolve({
+                    success: true,
+                    stdout,
+                    stderr: stderr || '',
+                    timestamp: new Date().toISOString()
+                });
+            }
         });
         
-        return {
-            success: true,
-            stdout,
-            stderr: '',
-            timestamp: new Date().toISOString()
-        };
-    } catch (error) {
-        return {
-            success: false,
-            stdout: error.stdout || '',
-            stderr: error.stderr || error.message,
-            timestamp: new Date().toISOString(),
-            exitCode: error.status || 1
-        };
-    }
+        // Handle timeout
+        child.on('error', (error) => {
+            resolve({
+                success: false,
+                stdout: '',
+                stderr: error.message,
+                timestamp: new Date().toISOString(),
+                exitCode: 1
+            });
+        });
+    });
 }
 
 /**
@@ -100,7 +126,7 @@ function saveMetadata(result, outputPath) {
 /**
  * Main execution function
  */
-function main() {
+async function main() {
     const args = process.argv.slice(2);
     
     if (args.length === 0) {
@@ -119,7 +145,7 @@ function main() {
         const command = buildCliCommand(artifact);
         
         // Execute command
-        const result = executeCommand(command);
+        const result = await executeCommand(command);
         
         // Create output directory
         const outputPath = path.join(OUTPUTS_DIR, `run-${Date.now()}`);
@@ -144,7 +170,10 @@ function main() {
 }
 
 if (require.main === module) {
-    main();
+    main().catch(error => {
+        console.error('Unhandled error:', error);
+        process.exit(1);
+    });
 }
 
 module.exports = {

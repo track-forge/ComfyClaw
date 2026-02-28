@@ -1,10 +1,10 @@
 const fs = require('fs');
 const path = require('path');
-const { execSync } = require('child_process');
+const { test, before, after } = require('node:test');
+const assert = require('assert');
 const {
     loadInputArtifact,
     buildCliCommand,
-    executeCommand,
     saveMetadata
 } = require('../scripts/execute-workflow-role.js');
 
@@ -24,68 +24,72 @@ const mockArtifact = {
 
 const mockArtifactPath = path.join(__dirname, 'mock-artifact.json');
 
-// Test suite
-describe('Execution Role Script', () => {
-    beforeAll(() => {
-        // Create mock artifact file
-        fs.writeFileSync(mockArtifactPath, JSON.stringify(mockArtifact, null, 2));
-    });
+before(() => {
+    // Create mock artifact file
+    fs.writeFileSync(mockArtifactPath, JSON.stringify(mockArtifact, null, 2));
+});
 
-    afterAll(() => {
-        // Clean up mock artifact file
-        if (fs.existsSync(mockArtifactPath)) {
-            fs.unlinkSync(mockArtifactPath);
-        }
-        
-        // Clean up test output directory
-        const testOutputDir = path.join(__dirname, '../outputs');
-        if (fs.existsSync(testOutputDir)) {
-            fs.rmSync(testOutputDir, { recursive: true });
-        }
-    });
+after(() => {
+    // Clean up mock artifact file
+    if (fs.existsSync(mockArtifactPath)) {
+        fs.unlinkSync(mockArtifactPath);
+    }
+    
+    // Clean up test output directory
+    const testOutputDir = path.join(__dirname, '../outputs');
+    if (fs.existsSync(testOutputDir)) {
+        fs.rmSync(testOutputDir, { recursive: true });
+    }
+});
 
-    test('should load input artifact', () => {
-        const artifact = loadInputArtifact(mockArtifactPath);
-        expect(artifact).toEqual(mockArtifact);
-    });
+test('should load input artifact', () => {
+    const artifact = loadInputArtifact(mockArtifactPath);
+    assert.deepStrictEqual(artifact, mockArtifact);
+});
 
-    test('should build CLI command correctly', () => {
-        const command = buildCliCommand(mockArtifact);
-        expect(command).toContain('node');
-        expect(command).toContain('cli.js');
-        expect(command).toContain('--run');
-        expect(command).toContain('test-workflow');
-        expect(command).toContain('--set');
-        expect(command).toContain('@prompt=Test prompt');
-        expect(command).toContain('--output-dir');
-    });
+test('should build CLI command correctly', () => {
+    const command = buildCliCommand(mockArtifact);
+    assert.ok(command.includes('cli.js'));
+    assert.ok(command.includes('--run'));
+    assert.ok(command.includes('test-workflow'));
+    assert.ok(command.includes('--set'));
+    assert.ok(command.includes('@prompt.text=Test prompt'));
+    assert.ok(command.includes('@negative.text=Test negative'));
+    assert.ok(command.includes('@ksampler.steps=20'));
+    // Check that output directory is positional argument (not --output-dir flag)
+    assert.ok(!command.includes('--output-dir'));
+    // Check that output directory is at the expected position (after --run workflow)
+    const outputPath = path.join(__dirname, '../outputs');
+    const outputDirIndex = command.indexOf(outputPath);
+    assert.ok(outputDirIndex > 0);
+    assert.strictEqual(command[outputDirIndex], outputPath);
+});
 
-    test('should handle missing workflow in artifact', () => {
-        const invalidArtifact = { ...mockArtifact };
-        delete invalidArtifact.workflow;
-        
-        expect(() => {
-            buildCliCommand(invalidArtifact);
-        }).toThrow('Workflow name is required in artifact');
-    });
+test('should handle missing workflow in artifact', () => {
+    const invalidArtifact = { ...mockArtifact };
+    delete invalidArtifact.workflow;
+    
+    assert.throws(() => {
+        buildCliCommand(invalidArtifact);
+    }, /Workflow name is required in artifact/);
+});
 
-    test('should save metadata', () => {
-        const result = {
-            success: true,
-            stdout: 'Test output',
-            stderr: '',
-            timestamp: new Date().toISOString()
-        };
-        
-        const outputPath = path.join(__dirname, '../outputs/test-run');
-        fs.mkdirSync(outputPath, { recursive: true });
-        
-        saveMetadata(result, outputPath);
-        
-        const metadataPath = path.join(outputPath, 'execution-metadata.json');
-        expect(fs.existsSync(metadataPath)).toBe(true);
-        
-        const savedMetadata = JSON.parse(fs.readFileSync(metadataPath, 'utf-8'));
-        expect(savedMetadata).toEqual(result);
-    });
+test('should save metadata', () => {
+    const result = {
+        success: true,
+        stdout: 'Test output',
+        stderr: '',
+        timestamp: new Date().toISOString()
+    };
+    
+    const outputPath = path.join(__dirname, '../outputs/test-run');
+    fs.mkdirSync(outputPath, { recursive: true });
+    
+    saveMetadata(result, outputPath);
+    
+    const metadataPath = path.join(outputPath, 'execution-metadata.json');
+    assert.ok(fs.existsSync(metadataPath));
+    
+    const savedMetadata = JSON.parse(fs.readFileSync(metadataPath, 'utf-8'));
+    assert.deepStrictEqual(savedMetadata, result);
 });
