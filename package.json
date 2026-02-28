@@ -10,7 +10,9 @@
   "scripts": {
     "list": "node cli.js --list",
     "describe": "node cli.js --describe",
-    "run": "node cli.js --run"
+    "run": "node cli.js --run",
+    "test": "node --test test/*.test.js",
+    "test:audit": "node scripts/workflow-audit.js"
   },
   "keywords": [
     "comfyui",

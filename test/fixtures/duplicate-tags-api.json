@@ -1,0 +1,17 @@
+{
+  "1": {
+    "inputs": { "text": "hello" },
+    "class_type": "CLIPTextEncode",
+    "_meta": { "title": "@prompt" }
+  },
+  "2": {
+    "inputs": { "text": "world" },
+    "class_type": "CLIPTextEncode",
+    "_meta": { "title": "@prompt" }
+  },
+  "3": {
+    "inputs": { "filename_prefix": "out", "images": ["1", 0] },
+    "class_type": "SaveImage",
+    "_meta": { "title": "@save" }
+  }
+}
