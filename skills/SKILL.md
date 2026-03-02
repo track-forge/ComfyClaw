@@ -50,6 +50,37 @@ Shows every `@tag` in the workflow and its editable parameters. If a ComfyUI ser
 - **linked** params are graph wiring — do NOT override these
 - If a workflow has no `@tags`, use raw node IDs (`--set nodeId.key=value`)
 
+### Read Metadata for Context
+
+**After selecting a workflow, read its metadata file** to understand purpose, style, model requirements, and usage guidance:
+
+> Note: Not all workflows have metadata files. Treat this as a known (and somewhat default) condition. If the meta file doesn't exist, proceed with --describe output alone.
+
+```bash
+# Metadata file location pattern
+${COMFYCLAW_DIR:-$PWD}/workflows/<workflow-name>-api.meta.json
+```
+
+The metadata provides:
+- **purpose** — What the workflow generates
+- **style** & **use_cases** — When to use this workflow
+- **models** — Recommended checkpoints, LoRAs, trigger words
+- **resolution** — Recommended dimensions
+- **context.prompt_guidance** — How to write effective prompts
+- **caveats** — Known limitations or special requirements
+
+**Example:**
+```bash
+# After selecting 'sample' workflow, read:
+cat workflows/sample-api.meta.json
+```
+
+Use this metadata to:
+- Choose appropriate prompts (check `context.prompt_guidance`)
+- Include required trigger words (see `models.loras[].trigger_words`)
+- Select proper resolutions (see `resolution.recommended`)
+- Understand workflow limitations (see `caveats`)
+
 ---
 
 ## 3. Run a Workflow (`--run`)
