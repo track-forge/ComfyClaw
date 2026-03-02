@@ -270,7 +270,8 @@ async function cmdRun(name, argv) {
     }
 
     // Parse remaining argv: [outDir] [--set key=val ...]
-    let outDir = path.join(__dirname, 'outputs');
+    const baseDir = process.env.COMFYCLAW_DIR || __dirname;
+    let outDir = path.join(baseDir, 'outputs');
     const setArgs = [];
     let i = 0;
 
@@ -427,6 +428,7 @@ function printUsage() {
     console.log('  --set @tag.key=value     Tag-based override (recommended)');
     console.log('  --set nodeId.key=value   Direct node-ID override\n');
     console.log('Environment:');
+    console.log('  COMFYCLAW_DIR        ComfyClaw repo directory (default: script location)');
     console.log('  COMFYUI_SERVER       Force a specific server URL');
     console.log('  COMFYUI_TIMEOUT_MS   Max wait time (default: 180000)');
 }
