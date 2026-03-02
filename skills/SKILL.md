@@ -54,9 +54,11 @@ Shows every `@tag` in the workflow and its editable parameters. If a ComfyUI ser
 
 **After selecting a workflow, read its metadata file** to understand purpose, style, model requirements, and usage guidance:
 
+> Note: Not all workflows have metadata files. Treat this as a known (and somewhat default) condition. If the meta file doesn't exist, proceed with --describe output alone.
+
 ```bash
 # Metadata file location pattern
-workflows/<workflow-name>-api.meta.json
+${COMFYCLAW_DIR:-$PWD}/workflows/<workflow-name>-api.meta.json
 ```
 
 The metadata provides:
