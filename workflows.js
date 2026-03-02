@@ -4,7 +4,8 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-const WORKFLOWS_DIR = path.join(__dirname, 'workflows');
+const BASE_DIR = process.env.COMFYCLAW_DIR || __dirname;
+const WORKFLOWS_DIR = path.join(BASE_DIR, 'workflows');
 
 /**
  * List all available API workflows.

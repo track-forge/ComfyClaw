@@ -12,10 +12,11 @@ A CLI tool for discovering, inspecting, and executing ComfyUI workflows.
 ## Quick Reference
 
 ```bash
-cd <ComfyClaw directory>
+# If COMFYCLAW_DIR is set, run from anywhere. Otherwise cd to the repo first.
+# export COMFYCLAW_DIR=/path/to/ComfyClaw
 
 # List available workflows
-node cli.js --list
+node ${COMFYCLAW_DIR:-$PWD}/cli.js --list
 
 # See editable parameters (queries live server for valid values)
 node cli.js --describe <workflow>
@@ -99,8 +100,23 @@ node cli.js --run text2image-example outputs \
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `COMFYUI_SERVER` | (auto-select) | Force a specific server URL |
-| `COMFYUI_TIMEOUT_MS` | `180000` | Max wait for completion (ms) |
+| `COMFYCLAW_DIR` | (script location) | Path to ComfyClaw repo root. Set this so the CLI can find workflows and outputs from anywhere. |
+| `COMFYUI_SERVER` | (auto-select) | Force a specific ComfyUI server URL (e.g. `http://localhost:8188`) |
+| `COMFYUI_TIMEOUT_MS` | `180000` | Max wait for workflow completion (ms) |
+
+### Setup
+
+If the user hasn't set `COMFYCLAW_DIR`, ask them where ComfyClaw is installed and recommend:
+
+```bash
+export COMFYCLAW_DIR=/path/to/ComfyClaw
+```
+
+With `COMFYCLAW_DIR` set, you can run the CLI from any directory:
+
+```bash
+node $COMFYCLAW_DIR/cli.js --list
+```
 
 ---
 
