@@ -1,6 +1,6 @@
 ---
 name: comfyclaw
-description: Run ComfyUI workflows via CLI. Use --list to discover workflows, --describe to see editable parameters (with live server values), --run to execute with --set @tag overrides. No need to read workflow files directly.
+description: Run ComfyUI workflows via CLI. Use --list to discover workflows, --describe to see editable parameters, --metadata to fetch companion metadata JSON, and --run to execute with --set @tag overrides. No need to read workflow files directly.
 ---
 
 # ComfyClaw Skill
@@ -20,6 +20,9 @@ node ${COMFYCLAW_DIR:-$PWD}/cli.js --list
 
 # See editable parameters (queries live server for valid values)
 node cli.js --describe <workflow>
+
+# Fetch workflow metadata JSON for context
+node cli.js --metadata <workflow>
 
 # Run a workflow with overrides
 node cli.js --run <workflow> [outDir] --set @tag.key=value ...
@@ -52,14 +55,17 @@ Shows every `@tag` in the workflow and its editable parameters. If a ComfyUI ser
 
 ### Read Metadata for Context
 
-**After selecting a workflow, read its metadata file** to understand purpose, style, model requirements, and usage guidance:
+**After selecting a workflow, fetch its metadata with the CLI** to understand purpose, style, model requirements, and usage guidance:
 
-> Note: Not all workflows have metadata files. Treat this as a known (and somewhat default) condition. If the meta file doesn't exist, proceed with --describe output alone.
+> Note: Not all workflows have metadata files. Treat this as a known (and somewhat default) condition. If metadata is missing, proceed with --describe output alone.
 
 ```bash
-# Metadata file location pattern
-${COMFYCLAW_DIR:-$PWD}/workflows/<workflow-name>-api.meta.json
+node cli.js --metadata <workflow-name>
 ```
+
+`--metadata` checks both companion file conventions:
+- `workflows/<workflow-name>-api.metadata.json`
+- `workflows/<workflow-name>-api.meta.json`
 
 The metadata provides:
 - **purpose** — What the workflow generates
@@ -71,8 +77,7 @@ The metadata provides:
 
 **Example:**
 ```bash
-# After selecting 'sample' workflow, read:
-cat workflows/sample-api.meta.json
+node cli.js --metadata sample
 ```
 
 Use this metadata to:
