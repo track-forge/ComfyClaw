@@ -10,7 +10,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { listWorkflows, loadWorkflow } = require('./workflows');
+const { listWorkflows, loadWorkflow, loadWorkflowMeta } = require('./workflows');
 const { applyNodeInputOverrides, resolveTagOverrides } = require('./patch');
 const { getServerWithLowestQueue } = require('./helpers');
 const ComfyUI = require('./comfy');
@@ -165,6 +165,25 @@ async function getServerURL() {
         if (!res.allServersDown && res.serverToUse) return res.serverToUse;
     } catch { /* ignore */ }
     return null;
+}
+
+function cmdMeta(name) {
+    if (!name) {
+        console.error('Error: --meta requires a workflow name.');
+        console.error('Usage: node cli.js --meta <workflow>');
+        console.error('Run "node cli.js --list" to see available workflows.');
+        process.exit(2);
+    }
+
+    const meta = loadWorkflowMeta(name);
+    if (!meta) {
+        console.log(`No metadata file found for workflow "${name}".`);
+        console.log(`Expected: workflows/${name}-api.meta.json`);
+        console.log('\nYou can still use --describe to see editable parameters.');
+        return;
+    }
+
+    console.log(JSON.stringify(meta, null, 2));
 }
 
 async function cmdDescribe(name) {
@@ -423,6 +442,7 @@ function printUsage() {
     console.log('Usage:');
     console.log('  node cli.js --list                              List available workflows');
     console.log('  node cli.js --describe <workflow>               Show editable @tag parameters');
+    console.log('  node cli.js --meta <workflow>                   Show workflow metadata (context)');
     console.log('  node cli.js --run <workflow> [outDir] [--set]   Run a workflow\n');
     console.log('Override parameters:');
     console.log('  --set @tag.key=value     Tag-based override (recommended)');
@@ -447,6 +467,8 @@ async function main() {
         cmdList();
     } else if (command === '--describe') {
         await cmdDescribe(argv[1]);
+    } else if (command === '--meta') {
+        cmdMeta(argv[1]);
     } else if (command === '--run') {
         await cmdRun(argv[1], argv.slice(2));
     } else {

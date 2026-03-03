@@ -21,6 +21,9 @@ node ${COMFYCLAW_DIR:-$PWD}/cli.js --list
 # See editable parameters (queries live server for valid values)
 node cli.js --describe <workflow>
 
+# ⚠️ ALWAYS read metadata before running (critical for prompt guidance)
+node cli.js --meta <workflow>
+
 # Run a workflow with overrides
 node cli.js --run <workflow> [outDir] --set @tag.key=value ...
 ```
@@ -37,7 +40,7 @@ Prints available workflow names. Use these names with `--describe` and `--run`.
 
 ---
 
-## 2. Inspect a Workflow (`--describe`)
+## 2. Inspect a Workflow (`--describe` → `--meta`)
 
 ```bash
 node cli.js --describe text2image-example
@@ -50,16 +53,17 @@ Shows every `@tag` in the workflow and its editable parameters. If a ComfyUI ser
 - **linked** params are graph wiring — do NOT override these
 - If a workflow has no `@tags`, use raw node IDs (`--set nodeId.key=value`)
 
-### Read Metadata for Context
+### ⚠️ ALWAYS Read Metadata Before Running (`--meta`)
 
-**After selecting a workflow, read its metadata file** to understand purpose, style, model requirements, and usage guidance:
-
-> Note: Not all workflows have metadata files. Treat this as a known (and somewhat default) condition. If the meta file doesn't exist, proceed with --describe output alone.
+**This step is critical.** After `--describe`, ALWAYS run `--meta` to get workflow context into your session:
 
 ```bash
-# Metadata file location pattern
-${COMFYCLAW_DIR:-$PWD}/workflows/<workflow-name>-api.meta.json
+node cli.js --meta <workflow>
 ```
+
+This prints the workflow's metadata JSON, which contains essential context you need before generating images. **Do not skip this step** — without metadata, you may use wrong prompts, miss trigger words, or pick incompatible settings.
+
+> Not all workflows have metadata files. If `--meta` reports none exists, proceed with `--describe` output alone.
 
 The metadata provides:
 - **purpose** — What the workflow generates
@@ -71,8 +75,7 @@ The metadata provides:
 
 **Example:**
 ```bash
-# After selecting 'sample' workflow, read:
-cat workflows/sample-api.meta.json
+node cli.js --meta text2image-example
 ```
 
 Use this metadata to:

@@ -74,4 +74,14 @@ function validateApiPrompt(data, filePath) {
     }
 }
 
-module.exports = { listWorkflows, loadWorkflow, WORKFLOWS_DIR };
+/**
+ * Load the metadata file for a workflow (e.g. "text2image-example" → "text2image-example-api.meta.json").
+ * Returns the parsed metadata object, or null if no meta file exists.
+ */
+function loadWorkflowMeta(name) {
+    const metaPath = path.join(WORKFLOWS_DIR, `${name}-api.meta.json`);
+    if (!fs.existsSync(metaPath)) return null;
+    return JSON.parse(fs.readFileSync(metaPath, 'utf8'));
+}
+
+module.exports = { listWorkflows, loadWorkflow, loadWorkflowMeta, WORKFLOWS_DIR };
