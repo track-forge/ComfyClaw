@@ -68,10 +68,39 @@ function loadWorkflow(name) {
     );
 }
 
+function resolveWorkflowMetadataPath(name) {
+    const candidates = [
+        path.join(WORKFLOWS_DIR, `${name}-api.metadata.json`),
+        path.join(WORKFLOWS_DIR, `${name}-api.meta.json`),
+        path.join(WORKFLOWS_DIR, `${name}.metadata.json`),
+        path.join(WORKFLOWS_DIR, `${name}.meta.json`),
+    ];
+
+    for (const candidate of candidates) {
+        if (fs.existsSync(candidate)) return candidate;
+    }
+
+    return null;
+}
+
+function loadWorkflowMetadata(name) {
+    const metaPath = resolveWorkflowMetadataPath(name);
+    if (!metaPath) {
+        return null;
+    }
+
+    const data = JSON.parse(fs.readFileSync(metaPath, 'utf8'));
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
+        throw new Error(`"${metaPath}" is not a valid metadata object.`);
+    }
+
+    return { path: metaPath, data };
+}
+
 function validateApiPrompt(data, filePath) {
     if (!data || typeof data !== 'object' || Array.isArray(data)) {
         throw new Error(`"${filePath}" is not a valid API prompt graph (expected an object keyed by node IDs).`);
     }
 }
 
-module.exports = { listWorkflows, loadWorkflow, WORKFLOWS_DIR };
+module.exports = { listWorkflows, loadWorkflow, loadWorkflowMetadata, resolveWorkflowMetadataPath, WORKFLOWS_DIR };

@@ -5,12 +5,13 @@
 // Usage:
 //   node cli.js --list
 //   node cli.js --describe <workflow>
+//   node cli.js --metadata <workflow>
 //   node cli.js --run <workflow> [outDir] [--set @tag.key=value ...]
 
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { listWorkflows, loadWorkflow } = require('./workflows');
+const { listWorkflows, loadWorkflow, loadWorkflowMetadata } = require('./workflows');
 const { applyNodeInputOverrides, resolveTagOverrides } = require('./patch');
 const { getServerWithLowestQueue } = require('./helpers');
 const ComfyUI = require('./comfy');
@@ -120,6 +121,7 @@ function cmdList() {
     console.log(`\nTotal: ${workflows.length} workflow(s)`);
     console.log('\nUsage:');
     console.log('  node cli.js --describe <name>   Show editable parameters');
+    console.log('  node cli.js --metadata <name>   Print workflow metadata JSON');
     console.log('  node cli.js --run <name>        Execute a workflow');
 }
 
@@ -165,6 +167,24 @@ async function getServerURL() {
         if (!res.allServersDown && res.serverToUse) return res.serverToUse;
     } catch { /* ignore */ }
     return null;
+}
+
+function cmdMetadata(name) {
+    if (!name) {
+        console.error('Error: --metadata requires a workflow name.');
+        console.error('Usage: node cli.js --metadata <workflow>');
+        console.error('Run "node cli.js --list" to see available workflows.');
+        process.exit(2);
+    }
+
+    const result = loadWorkflowMetadata(name);
+    if (!result) {
+        console.error(`No metadata file found for workflow "${name}".`);
+        console.error('Looked for both *.metadata.json and *.meta.json companion files.');
+        process.exit(1);
+    }
+
+    console.log(JSON.stringify(result.data, null, 2));
 }
 
 async function cmdDescribe(name) {
@@ -423,6 +443,7 @@ function printUsage() {
     console.log('Usage:');
     console.log('  node cli.js --list                              List available workflows');
     console.log('  node cli.js --describe <workflow>               Show editable @tag parameters');
+    console.log('  node cli.js --metadata <workflow>               Print workflow metadata JSON');
     console.log('  node cli.js --run <workflow> [outDir] [--set]   Run a workflow\n');
     console.log('Override parameters:');
     console.log('  --set @tag.key=value     Tag-based override (recommended)');
@@ -447,6 +468,8 @@ async function main() {
         cmdList();
     } else if (command === '--describe') {
         await cmdDescribe(argv[1]);
+    } else if (command === '--metadata') {
+        cmdMetadata(argv[1]);
     } else if (command === '--run') {
         await cmdRun(argv[1], argv.slice(2));
     } else {

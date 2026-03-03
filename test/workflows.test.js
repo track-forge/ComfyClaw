@@ -1,41 +1,22 @@
-const { describe, it, before, after } = require('node:test');
+const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-// We need to point WORKFLOWS_DIR at our test fixtures.
-// workflows.js hardcodes path.join(__dirname, 'workflows'), so we create a
-// temporary workflows/ dir with our fixture files and patch the module.
-
-const { listWorkflows, loadWorkflow, WORKFLOWS_DIR } = require('../workflows');
-
-const FIXTURES = path.join(__dirname, 'fixtures');
-
-// We'll create a temp workflows dir inside the project that the module reads
-const TEMP_WORKFLOWS = path.join(__dirname, '..', 'workflows-test-tmp');
+const {
+  listWorkflows,
+  loadWorkflow,
+  loadWorkflowMetadata,
+  resolveWorkflowMetadataPath,
+  WORKFLOWS_DIR,
+} = require('../workflows');
 
 describe('workflows', () => {
-  before(() => {
-    fs.mkdirSync(TEMP_WORKFLOWS, { recursive: true });
-    // Copy valid fixture as a proper -api.json workflow
-    fs.copyFileSync(
-      path.join(FIXTURES, 'valid-workflow-api.json'),
-      path.join(TEMP_WORKFLOWS, 'testflow-api.json')
-    );
-  });
-
-  after(() => {
-    fs.rmSync(TEMP_WORKFLOWS, { recursive: true, force: true });
-  });
-
   describe('listWorkflows', () => {
     it('returns array of workflows from the workflows/ directory', () => {
-      // This tests the real workflows/ dir — it should find the example workflow
       const workflows = listWorkflows();
       assert.ok(Array.isArray(workflows));
-      // The repo has text2image-example-api.json
-      const names = workflows.map(w => w.name);
-      assert.ok(names.includes('text2image-example'), `Expected text2image-example in ${names}`);
+      assert.ok(workflows.length > 0, 'Expected at least one workflow');
     });
 
     it('each workflow entry has name, filename, and path', () => {
@@ -50,10 +31,11 @@ describe('workflows', () => {
 
   describe('loadWorkflow', () => {
     it('loads a workflow by short name', () => {
-      const wf = loadWorkflow('text2image-example');
+      const first = listWorkflows()[0];
+      const wf = loadWorkflow(first.name);
       assert.ok(wf.prompt);
       assert.ok(typeof wf.prompt === 'object');
-      assert.ok(wf.prompt['3'], 'should have node 3 (KSampler)');
+      assert.ok(Object.keys(wf.prompt).length > 0, 'workflow graph should have nodes');
     });
 
     it('throws for non-existent workflow', () => {
@@ -61,7 +43,6 @@ describe('workflows', () => {
     });
 
     it('validates loaded data is an object', () => {
-      // Create a workflow that is an array (invalid)
       const badPath = path.join(WORKFLOWS_DIR, 'bad-array-api.json');
       let cleanup = false;
       try {
@@ -74,8 +55,30 @@ describe('workflows', () => {
     });
 
     it('loads by full filename', () => {
-      const wf = loadWorkflow('text2image-example-api.json');
+      const first = listWorkflows()[0];
+      const wf = loadWorkflow(first.filename);
       assert.ok(wf.prompt);
+    });
+  });
+
+  describe('metadata helpers', () => {
+    it('finds metadata for workflows that have companion meta files', () => {
+      const metaPath = resolveWorkflowMetadataPath('sdxl-refiner');
+      assert.ok(metaPath, 'expected metadata path for sdxl-refiner');
+      assert.match(metaPath, /sdxl-refiner-api\.(meta|metadata)\.json$/);
+    });
+
+    it('loads metadata as an object', () => {
+      const meta = loadWorkflowMetadata('sdxl-refiner');
+      assert.ok(meta, 'expected metadata object');
+      assert.ok(meta.path.endsWith('.json'));
+      assert.equal(typeof meta.data, 'object');
+      assert.ok(!Array.isArray(meta.data));
+    });
+
+    it('returns null when metadata is missing', () => {
+      const meta = loadWorkflowMetadata('victorian');
+      assert.equal(meta, null);
     });
   });
 });

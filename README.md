@@ -29,6 +29,9 @@ node cli.js --list
 # See what's editable (queries the live server for available models/samplers)
 node cli.js --describe text2image-example
 
+# Pull workflow metadata context JSON
+node cli.js --metadata text2image-example
+
 # Run with tag-based overrides
 node cli.js --run text2image-example outputs \
   --set @prompt.text="a beautiful sunset over the ocean" \
@@ -95,6 +98,16 @@ Server: http://localhost:8188
 @save  (node 9, SaveImage)
   editable:
     --set @save.filename_prefix="ComfyUI"
+```
+
+### `--metadata <workflow>`
+
+Prints companion metadata JSON for the selected workflow (for agent/context guidance). It checks both naming conventions:
+- `workflows/<name>-api.metadata.json`
+- `workflows/<name>-api.meta.json`
+
+```bash
+node cli.js --metadata text2image-example
 ```
 
 ### `--run <workflow> [outDir] [--set ...]`
@@ -250,7 +263,7 @@ Error: ComfyUI server error (HTTP 400):
 ## Architecture
 
 ```
-cli.js              Unified CLI entrypoint (--list, --describe, --run)
+cli.js              Unified CLI entrypoint (--list, --describe, --metadata, --run)
 workflows.js        Workflow discovery and loading
 patch.js            Safe parameter overrides with @tag resolution
 comfy.js            ComfyUI WebSocket/HTTP client
