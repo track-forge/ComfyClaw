@@ -201,6 +201,97 @@ For each workflow, add metadata and mapping files:
 
 ---
 
+## 5. Model & LoRA Inventory (`--inventory`)
+
+ComfyClaw can query your ComfyUI server for all available models, LoRAs, VAEs, and other assets — and let you annotate them with descriptions and tags. This helps agents and humans understand what's available without reading workflow files.
+
+### Pull inventory from server
+
+```bash
+node cli.js --inventory pull
+```
+
+Queries the ComfyUI `/object_info` API for all available:
+- **checkpoints** — Base models (SDXL, Pony, etc.)
+- **loras** — Style/concept LoRAs with trigger words
+- **vaes** — VAE decoders
+- **upscalers** — Upscale models
+- **samplers** — Sampling algorithms (euler, dpmpp_2m, etc.)
+- **schedulers** — Noise schedules (karras, normal, etc.)
+
+Creates metadata stub files in `inventory/` for any new assets found. Existing metadata is preserved.
+
+### Browse available assets
+
+```bash
+# Summary of all asset types and counts
+node cli.js --inventory list
+
+# List all LoRAs with descriptions and tags
+node cli.js --inventory list loras
+
+# List all checkpoints
+node cli.js --inventory list checkpoints
+```
+
+Output shows each asset with its description and tags (if annotated):
+
+```
+loras (15):
+
+  mirror-reflections.safetensors — Reflective surfaces style LoRA. Trigger: mirror_reflections [style, reflections]
+  some-other-lora.safetensors
+```
+
+### View asset metadata
+
+```bash
+node cli.js --inventory info loras mirror-reflections.safetensors
+```
+
+Shows the full metadata object (description, tags, notes) for a specific asset.
+
+### Annotate assets
+
+```bash
+node cli.js --inventory set <type> <name> key=value [key=value ...]
+```
+
+Supported fields:
+- **description** — What the asset does, style notes, trigger words
+- **tags** — Comma-separated categories (e.g. `tags=victorian,photorealistic,portrait`)
+- **notes** — Freeform notes (compatibility, tips, etc.)
+
+Example:
+```bash
+node cli.js --inventory set loras mirror-reflections.safetensors \
+  description="Reflective surfaces and mirror effects. Trigger word: mirror_reflections" \
+  tags=style,reflections,artistic \
+  notes="Works best with SDXL checkpoints at strength 0.6-0.8"
+```
+
+### Inventory workflow for agents
+
+1. **On first setup:** Run `--inventory pull` to discover what's available
+2. **Browse:** Use `--inventory list <type>` to see assets before selecting a workflow
+3. **Before running:** Check `--inventory info` for trigger words or compatibility notes
+4. **After experimenting:** Use `--inventory set` to record what you learned about an asset
+5. **Periodically:** Re-run `--inventory pull` after new models are installed on the server
+
+### File layout
+
+```
+inventory/
+  inventory.json          # Raw asset lists from server (gitignored, server-specific)
+  checkpoints.meta.json   # User-editable metadata (committed, shareable)
+  loras.meta.json
+  vaes.meta.json
+  samplers.meta.json
+  schedulers.meta.json
+```
+
+---
+
 ## Troubleshooting
 
 | Problem | Solution |
