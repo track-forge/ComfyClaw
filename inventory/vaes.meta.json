@@ -1,0 +1,7 @@
+{
+  "sdxl_vae-example.safetensors": {
+    "description": "Example VAE entry. Run --inventory pull to populate.",
+    "tags": ["sdxl", "example"],
+    "notes": ""
+  }
+}

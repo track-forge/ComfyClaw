@@ -1,0 +1,7 @@
+{
+  "euler": {
+    "description": "Example sampler entry. Run --inventory pull to populate.",
+    "tags": ["example"],
+    "notes": ""
+  }
+}
