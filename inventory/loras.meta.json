@@ -1,0 +1,7 @@
+{
+  "mirror-reflections-example.safetensors": {
+    "description": "Example LoRA entry. Run --inventory pull to populate with your server's LoRAs.",
+    "tags": ["example", "style"],
+    "notes": "Trigger word: mirror_reflections (example). Replace with your own LoRA metadata after pulling."
+  }
+}

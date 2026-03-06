@@ -260,16 +260,68 @@ Error: ComfyUI server error (HTTP 400):
 
 ---
 
+## Model & LoRA Inventory
+
+ComfyClaw can query your ComfyUI server for all available models, LoRAs, VAEs, and other assets — and let you annotate them with descriptions and tags.
+
+### Pull inventory from server
+
+```bash
+node cli.js --inventory pull
+```
+
+This fetches all available assets and creates metadata stubs in `inventory/`.
+
+### Browse assets
+
+```bash
+# Summary of all asset types
+node cli.js --inventory list
+
+# List all LoRAs with descriptions and tags
+node cli.js --inventory list loras
+
+# List all checkpoints
+node cli.js --inventory list checkpoints
+```
+
+### Annotate assets
+
+```bash
+# Add description and tags to a LoRA
+node cli.js --inventory set loras mirror-reflections.safetensors \
+  description="Mirror reflections style LoRA. Trigger word: mirror_reflections" \
+  tags=style,reflections,artistic
+
+# View metadata for a specific asset
+node cli.js --inventory info loras mirror-reflections.safetensors
+```
+
+### How it works
+
+- `inventory/inventory.json` — Raw asset lists from the server (gitignored, server-specific)
+- `inventory/<type>.meta.json` — User-editable metadata (committed, shareable)
+- Asset types: `checkpoints`, `loras`, `vaes`, `upscalers`, `samplers`, `schedulers`
+- Metadata fields: `description`, `tags` (array), `notes` (freeform)
+- Running `pull` preserves existing metadata — only adds stubs for new assets
+- Shipped with generic example entries; run `pull` to populate with your server's actual assets
+
+This lets agents and humans know what's available and what each model/LoRA is good for, without reading workflow files.
+
+---
+
 ## Architecture
 
 ```
-cli.js              Unified CLI entrypoint (--list, --describe, --metadata, --run)
+cli.js              Unified CLI entrypoint (--list, --describe, --metadata, --run, --inventory)
 workflows.js        Workflow discovery and loading
+inventory.js        Model/LoRA inventory and metadata management
 patch.js            Safe parameter overrides with @tag resolution
 comfy.js            ComfyUI WebSocket/HTTP client
 helpers.js          Server selection (lowest queue)
 config.js           Server and AWS S3 configuration
 workflows/          Workflow JSON files (*-api.json)
+inventory/          Asset metadata (*.meta.json) + server inventory
 ```
 
 ---

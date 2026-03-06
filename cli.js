@@ -16,6 +16,7 @@ const { applyNodeInputOverrides, resolveTagOverrides } = require('./patch');
 const { getServerWithLowestQueue } = require('./helpers');
 const ComfyUI = require('./comfy');
 const config = require('./config');
+const inventory = require('./inventory');
 
 // ── Optional S3 Upload ──────────────────────────────────────────────────────
 
@@ -436,6 +437,153 @@ async function cmdRun(name, argv) {
     downloaded.forEach((p) => console.log(`  - ${p}`));
 }
 
+// ── Inventory Commands ───────────────────────────────────────────────────────
+
+async function cmdInventoryPull() {
+    const serverURL = await inventory.getServerURL();
+    if (!serverURL) {
+        console.error('No ComfyUI server available. Set COMFYUI_SERVER or configure servers in config.js.');
+        process.exit(1);
+    }
+
+    console.log(`Pulling inventory from ${serverURL}...`);
+    const inv = await inventory.pullInventory(serverURL);
+    inv._server = serverURL;
+    const saved = inventory.saveInventory(inv);
+
+    // Init metadata stubs for new assets
+    inventory.initMetadataFromInventory(saved);
+
+    console.log('\nInventory:');
+    for (const [type, items] of Object.entries(saved.assets)) {
+        console.log(`  ${type}: ${items.length} item(s)`);
+    }
+    console.log(`\nSaved to: ${inventory.INVENTORY_DIR}/`);
+    console.log('Metadata files initialized (existing entries preserved).');
+}
+
+function cmdInventoryList(type) {
+    const inv = inventory.loadInventory();
+    if (!inv) {
+        console.error('No inventory found. Run: node cli.js --inventory pull');
+        process.exit(1);
+    }
+
+    const validTypes = Object.keys(inv.assets);
+
+    if (!type) {
+        // Show summary
+        console.log(`Inventory (pulled: ${inv.pulled_at})`);
+        if (inv.server) console.log(`Server: ${inv.server}`);
+        console.log('');
+        for (const [t, items] of Object.entries(inv.assets)) {
+            console.log(`  ${t}: ${items.length}`);
+        }
+        console.log(`\nUse: node cli.js --inventory list <type>`);
+        console.log(`Types: ${validTypes.join(', ')}`);
+        return;
+    }
+
+    if (!inv.assets[type]) {
+        console.error(`Unknown asset type: "${type}"`);
+        console.error(`Valid types: ${validTypes.join(', ')}`);
+        process.exit(1);
+    }
+
+    const items = inv.assets[type];
+    const meta = inventory.loadMetadata(type);
+
+    console.log(`${type} (${items.length}):\n`);
+    for (const item of items) {
+        const m = meta[item];
+        const desc = m?.description ? ` — ${m.description}` : '';
+        const tags = m?.tags?.length ? ` [${m.tags.join(', ')}]` : '';
+        console.log(`  ${item}${desc}${tags}`);
+    }
+}
+
+function cmdInventoryInfo(type, name) {
+    if (!type || !name) {
+        console.error('Usage: node cli.js --inventory info <type> <name>');
+        console.error('Example: node cli.js --inventory info loras gildedvictoriansxl_v2-000005.safetensors');
+        process.exit(2);
+    }
+
+    const meta = inventory.getAssetMetadata(type, name);
+    if (!meta) {
+        console.log(`No metadata for ${type}/${name}.`);
+        console.log('Run --inventory pull first, then --inventory set to add metadata.');
+        return;
+    }
+
+    console.log(`${type}: ${name}\n`);
+    console.log(JSON.stringify(meta, null, 2));
+}
+
+function cmdInventorySet(type, name, kvPairs) {
+    if (!type || !name || kvPairs.length === 0) {
+        console.error('Usage: node cli.js --inventory set <type> <name> key=value [key=value ...]');
+        console.error('Example: node cli.js --inventory set loras gildedvictoriansxl_v2-000005.safetensors description="Victorian era LoRA" tags=victorian,photorealistic,1880s');
+        process.exit(2);
+    }
+
+    const fields = {};
+    for (const kv of kvPairs) {
+        const eqIdx = kv.indexOf('=');
+        if (eqIdx === -1) {
+            console.error(`Invalid key=value pair: "${kv}"`);
+            process.exit(2);
+        }
+        const key = kv.slice(0, eqIdx);
+        let value = kv.slice(eqIdx + 1);
+
+        // Parse tags as array
+        if (key === 'tags') {
+            value = value.split(',').map((t) => t.trim()).filter(Boolean);
+        }
+
+        fields[key] = value;
+    }
+
+    const result = inventory.setAssetMetadata(type, name, fields);
+    console.log(`Updated ${type}/${name}:`);
+    console.log(JSON.stringify(result, null, 2));
+}
+
+async function cmdInventory(argv) {
+    const sub = argv[0];
+
+    if (!sub || sub === 'help') {
+        console.log('Inventory — Manage available models, LoRAs, VAEs, and more.\n');
+        console.log('Usage:');
+        console.log('  node cli.js --inventory pull                          Fetch inventory from server');
+        console.log('  node cli.js --inventory list [type]                   List assets (summary or by type)');
+        console.log('  node cli.js --inventory info <type> <name>            Show metadata for an asset');
+        console.log('  node cli.js --inventory set <type> <name> key=val     Set metadata fields\n');
+        console.log('Types: checkpoints, loras, vaes, upscalers, samplers, schedulers');
+        console.log('\nExamples:');
+        console.log('  node cli.js --inventory pull');
+        console.log('  node cli.js --inventory list loras');
+        console.log('  node cli.js --inventory set loras gildedvictoriansxl_v2-000005.safetensors \\');
+        console.log('    description="Victorian era photography" tags=victorian,photorealistic,1880s');
+        return;
+    }
+
+    if (sub === 'pull') {
+        await cmdInventoryPull();
+    } else if (sub === 'list') {
+        cmdInventoryList(argv[1]);
+    } else if (sub === 'info') {
+        cmdInventoryInfo(argv[1], argv[2]);
+    } else if (sub === 'set') {
+        cmdInventorySet(argv[1], argv[2], argv.slice(3));
+    } else {
+        console.error(`Unknown inventory subcommand: "${sub}"`);
+        console.error('Run: node cli.js --inventory help');
+        process.exit(2);
+    }
+}
+
 // ── Main ─────────────────────────────────────────────────────────────────────
 
 function printUsage() {
@@ -444,10 +592,16 @@ function printUsage() {
     console.log('  node cli.js --list                              List available workflows');
     console.log('  node cli.js --describe <workflow>               Show editable @tag parameters');
     console.log('  node cli.js --metadata <workflow>               Print workflow metadata JSON');
-    console.log('  node cli.js --run <workflow> [outDir] [--set]   Run a workflow\n');
+    console.log('  node cli.js --run <workflow> [outDir] [--set]   Run a workflow');
+    console.log('  node cli.js --inventory <subcommand>            Manage models, LoRAs, VAEs\n');
     console.log('Override parameters:');
     console.log('  --set @tag.key=value     Tag-based override (recommended)');
     console.log('  --set nodeId.key=value   Direct node-ID override\n');
+    console.log('Inventory subcommands:');
+    console.log('  pull                     Fetch available assets from ComfyUI server');
+    console.log('  list [type]              List assets (summary or by type)');
+    console.log('  info <type> <name>       Show metadata for a specific asset');
+    console.log('  set <type> <name> k=v    Update metadata for an asset\n');
     console.log('Environment:');
     console.log('  COMFYCLAW_DIR        ComfyClaw repo directory (default: script location)');
     console.log('  COMFYUI_SERVER       Force a specific server URL');
@@ -472,6 +626,8 @@ async function main() {
         cmdMetadata(argv[1]);
     } else if (command === '--run') {
         await cmdRun(argv[1], argv.slice(2));
+    } else if (command === '--inventory') {
+        await cmdInventory(argv.slice(1));
     } else {
         console.error(`Unknown command: ${command}`);
         printUsage();

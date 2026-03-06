@@ -1,0 +1,7 @@
+{
+  "karras": {
+    "description": "Example scheduler entry. Run --inventory pull to populate.",
+    "tags": ["example"],
+    "notes": ""
+  }
+}

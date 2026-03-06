@@ -1,0 +1,7 @@
+{
+  "sdxl-refiner-example.safetensors": {
+    "description": "Example entry. Run --inventory pull to populate with your server's models.",
+    "tags": ["sdxl", "example"],
+    "notes": "This is a placeholder. Pull your own inventory to see real models."
+  }
+}
