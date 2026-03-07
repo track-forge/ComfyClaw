@@ -11,6 +11,7 @@
     "list": "node cli.js --list",
     "describe": "node cli.js --describe",
     "run": "node cli.js --run",
+    "meta:fields": "node scripts/meta-available-fields.js",
     "test": "node --test test/*.test.js",
     "test:audit": "node scripts/workflow-audit.js"
   },

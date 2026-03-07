@@ -182,6 +182,21 @@ Each `@tag` must be unique within a workflow.
 2. Tag the nodes you want to be editable with `@tag` names in `_meta.title`
 3. Save as `workflows/<name>-api.json`
 4. Verify with `node cli.js --describe <name>`
+5. Add/update companion metadata and generate `available_fields` from tagged scalar inputs:
+
+```bash
+# Writes/updates workflows/<name>-api.meta.json
+node scripts/meta-available-fields.js <name>
+
+# Example
+node scripts/meta-available-fields.js zimage-turbo
+```
+
+This adds (or refreshes) a top-level `available_fields` array in the workflow metadata file, for example:
+
+```json
+"available_fields": ["prompt.text", "save.filename_prefix"]
+```
 
 > **Important:** ComfyClaw requires the **API format** export. The default "Save" in ComfyUI produces a UI export (with `nodes` and `links` arrays) which is not supported. Use **Save (API Format)** instead.
 
