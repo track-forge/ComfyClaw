@@ -139,9 +139,61 @@ function resolveTagOverrides(apiPrompt, setArgs) {
   return overrides;
 }
 
+/**
+ * Randomize all seed fields in an API prompt.
+ *
+ * ComfyUI seeds are unsigned 64-bit integers (0 to 2^64 - 1).
+ * JavaScript can safely represent integers up to 2^53 - 1 (Number.MAX_SAFE_INTEGER).
+ * We use that range to avoid precision issues.
+ *
+ * Scans every node's inputs for keys named "seed" with a numeric value
+ * and replaces them with a cryptographically random value.
+ *
+ * Skips nodes whose seed was explicitly set via overrides (pass appliedOverrides
+ * to preserve user intent).
+ *
+ * Returns the list of randomized entries for logging.
+ */
+function randomizeSeeds(apiPrompt, appliedOverrides) {
+  const randomized = [];
+  const overriddenSeeds = new Set();
+
+  // Build set of nodeId keys that had seed explicitly overridden
+  if (appliedOverrides) {
+    for (const entry of appliedOverrides) {
+      if (entry.key === 'seed') {
+        overriddenSeeds.add(entry.nodeId);
+      }
+    }
+  }
+
+  for (const [nodeId, node] of Object.entries(apiPrompt)) {
+    if (!node?.inputs || typeof node.inputs !== 'object') continue;
+    if (!('seed' in node.inputs)) continue;
+    if (typeof node.inputs.seed !== 'number') continue;
+
+    // Skip if user explicitly set this seed via --set
+    if (overriddenSeeds.has(nodeId)) continue;
+
+    const newSeed = Math.floor(Math.random() * Number.MAX_SAFE_INTEGER);
+    const oldSeed = node.inputs.seed;
+    node.inputs.seed = newSeed;
+    randomized.push({
+      nodeId,
+      title: node._meta?.title || null,
+      classType: node.class_type || null,
+      oldSeed,
+      newSeed,
+    });
+  }
+
+  return randomized;
+}
+
 module.exports = {
   applyNodeInputOverrides,
   parseSetArgs,
   resolveTagOverrides,
   coerceValue,
+  randomizeSeeds,
 };
