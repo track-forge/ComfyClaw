@@ -12,7 +12,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const { listWorkflows, loadWorkflow, loadWorkflowMetadata } = require('./workflows');
-const { applyNodeInputOverrides, resolveTagOverrides } = require('./patch');
+const { applyNodeInputOverrides, resolveTagOverrides, randomizeSeeds } = require('./patch');
 const { getServerWithLowestQueue } = require('./helpers');
 const ComfyUI = require('./comfy');
 const config = require('./config');
@@ -325,6 +325,16 @@ async function cmdRun(name, argv) {
     if (skipped.length) {
         console.log('Skipped overrides:');
         skipped.forEach((o) => console.log(`  - node ${o.nodeId}${o.key ? '.' + o.key : ''}: ${o.reason}`));
+    }
+
+    // Randomize seeds (skips any seeds explicitly set via --set)
+    const randomized = randomizeSeeds(apiPrompt, applied);
+    if (randomized.length) {
+        console.log('Randomized seeds:');
+        randomized.forEach((r) => {
+            const label = r.title || r.classType || `node ${r.nodeId}`;
+            console.log(`  - ${label} (node ${r.nodeId}): ${r.newSeed}`);
+        });
     }
 
     // Server selection
