@@ -1,6 +1,12 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
-const { coerceValue, parseSetArgs, resolveTagOverrides, applyNodeInputOverrides } = require('../patch');
+const {
+  coerceValue,
+  parseSetArgs,
+  resolveTagOverrides,
+  applyNodeInputOverrides,
+  pruneOptionalBflImageInputs,
+} = require('../patch');
 
 // ---------------------------------------------------------------------------
 // coerceValue
@@ -198,5 +204,46 @@ describe('applyNodeInputOverrides', () => {
     const { applied, skipped } = applyNodeInputOverrides(prompt, {});
     assert.strictEqual(applied.length, 0);
     assert.strictEqual(skipped.length, 0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// pruneOptionalBflImageInputs
+// ---------------------------------------------------------------------------
+describe('pruneOptionalBflImageInputs', () => {
+  it('removes ImageToBase64_BFL node and consumer link when source LoadImage is empty', () => {
+    const prompt = {
+      '100': { class_type: 'LoadImage', inputs: { image: '' } },
+      '101': { class_type: 'ImageToBase64_BFL', inputs: { image: ['100', 0], output_format: 'jpeg' } },
+      '200': { class_type: 'FluxKontextPro_BFL', inputs: { input_image_2: ['101', 0], prompt: 'x' } },
+    };
+
+    const { apiPrompt, removedNodeIds, disconnectedInputs } = pruneOptionalBflImageInputs(prompt);
+
+    assert.equal(apiPrompt['101'], undefined);
+    assert.equal(apiPrompt['100'], undefined);
+    assert.equal(apiPrompt['200'].inputs.input_image_2, undefined);
+    assert.ok(removedNodeIds.includes('101'));
+    assert.ok(removedNodeIds.includes('100'));
+    assert.deepStrictEqual(disconnectedInputs, [{
+      nodeId: '200',
+      key: 'input_image_2',
+      fromNodeId: '101',
+    }]);
+  });
+
+  it('keeps BFL chain when LoadImage has a filename', () => {
+    const prompt = {
+      '100': { class_type: 'LoadImage', inputs: { image: 'face.png' } },
+      '101': { class_type: 'ImageToBase64_BFL', inputs: { image: ['100', 0], output_format: 'jpeg' } },
+      '200': { class_type: 'FluxKontextPro_BFL', inputs: { input_image_2: ['101', 0] } },
+    };
+
+    const { apiPrompt, removedNodeIds, disconnectedInputs } = pruneOptionalBflImageInputs(prompt);
+
+    assert.ok(apiPrompt['101']);
+    assert.ok(apiPrompt['100']);
+    assert.deepStrictEqual(removedNodeIds, []);
+    assert.deepStrictEqual(disconnectedInputs, []);
   });
 });

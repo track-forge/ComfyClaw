@@ -12,7 +12,12 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const { listWorkflows, loadWorkflow, loadWorkflowMetadata } = require('./workflows');
-const { applyNodeInputOverrides, resolveTagOverrides, randomizeSeeds } = require('./patch');
+const {
+    applyNodeInputOverrides,
+    resolveTagOverrides,
+    randomizeSeeds,
+    pruneOptionalBflImageInputs,
+} = require('./patch');
 const { getServerWithLowestQueue } = require('./helpers');
 const ComfyUI = require('./comfy');
 const config = require('./config');
@@ -325,6 +330,18 @@ async function cmdRun(name, argv) {
     if (skipped.length) {
         console.log('Skipped overrides:');
         skipped.forEach((o) => console.log(`  - node ${o.nodeId}${o.key ? '.' + o.key : ''}: ${o.reason}`));
+    }
+
+    // Prune optional BFL image conversion chains when image filename is blank.
+    const { removedNodeIds, disconnectedInputs } = pruneOptionalBflImageInputs(apiPrompt);
+    if (disconnectedInputs.length || removedNodeIds.length) {
+        console.log('Pruned optional empty BFL image inputs:');
+        disconnectedInputs.forEach((d) => {
+            console.log(`  - node ${d.nodeId}: removed input ${d.key} (from node ${d.fromNodeId})`);
+        });
+        removedNodeIds.forEach((nodeId) => {
+            console.log(`  - removed node ${nodeId}`);
+        });
     }
 
     // Randomize seeds (skips any seeds explicitly set via --set)

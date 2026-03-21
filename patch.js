@@ -190,10 +190,108 @@ function randomizeSeeds(apiPrompt, appliedOverrides) {
   return randomized;
 }
 
+function isEmptyImageValue(v) {
+  return (
+    v === null ||
+    v === undefined ||
+    (typeof v === 'string' && v.trim() === '')
+  );
+}
+
+/**
+ * Remove optional BFL image conversion chains when upstream LoadImage filename
+ * is empty. This avoids runtime errors from ImageToBase64_BFL nodes that
+ * require a concrete image.
+ *
+ * Behavior:
+ * - Finds LoadImage nodes with empty `inputs.image`.
+ * - Finds ImageToBase64_BFL nodes connected to those empty LoadImage nodes.
+ * - Deletes those ImageToBase64_BFL nodes.
+ * - Removes any links that reference the deleted converter nodes by deleting
+ *   the corresponding input key on consumer nodes.
+ * - Deletes now-unreferenced empty LoadImage nodes used only by the removed
+ *   converters.
+ */
+function pruneOptionalBflImageInputs(apiPrompt) {
+  const removedNodeIds = [];
+  const disconnectedInputs = [];
+
+  const emptyLoadImageIds = new Set();
+  for (const [nodeId, node] of Object.entries(apiPrompt)) {
+    if (node?.class_type !== 'LoadImage') continue;
+    if (!isEmptyImageValue(node?.inputs?.image)) continue;
+    emptyLoadImageIds.add(nodeId);
+  }
+
+  if (emptyLoadImageIds.size === 0) {
+    return { apiPrompt, removedNodeIds, disconnectedInputs };
+  }
+
+  const bflConvertersToRemove = new Set();
+  for (const [nodeId, node] of Object.entries(apiPrompt)) {
+    if (node?.class_type !== 'ImageToBase64_BFL') continue;
+    const imageInput = node?.inputs?.image;
+    if (!Array.isArray(imageInput) || imageInput.length !== 2) continue;
+    if (emptyLoadImageIds.has(String(imageInput[0]))) {
+      bflConvertersToRemove.add(nodeId);
+    }
+  }
+
+  if (bflConvertersToRemove.size === 0) {
+    return { apiPrompt, removedNodeIds, disconnectedInputs };
+  }
+
+  // Disconnect any references to removed converter outputs.
+  for (const [consumerId, consumer] of Object.entries(apiPrompt)) {
+    if (!consumer?.inputs || typeof consumer.inputs !== 'object') continue;
+    for (const [inputKey, inputVal] of Object.entries(consumer.inputs)) {
+      if (!Array.isArray(inputVal) || inputVal.length !== 2) continue;
+      if (!bflConvertersToRemove.has(String(inputVal[0]))) continue;
+
+      delete consumer.inputs[inputKey];
+      disconnectedInputs.push({
+        nodeId: consumerId,
+        key: inputKey,
+        fromNodeId: String(inputVal[0]),
+      });
+    }
+  }
+
+  // Remove converters.
+  for (const converterId of bflConvertersToRemove) {
+    if (apiPrompt[converterId]) {
+      delete apiPrompt[converterId];
+      removedNodeIds.push(converterId);
+    }
+  }
+
+  // Remove empty LoadImage nodes that are now unreferenced.
+  const referencedNodeIds = new Set();
+  for (const node of Object.values(apiPrompt)) {
+    const inputs = node?.inputs;
+    if (!inputs || typeof inputs !== 'object') continue;
+    for (const value of Object.values(inputs)) {
+      if (Array.isArray(value) && value.length === 2 && typeof value[0] === 'string') {
+        referencedNodeIds.add(value[0]);
+      }
+    }
+  }
+
+  for (const loadId of emptyLoadImageIds) {
+    if (!apiPrompt[loadId]) continue;
+    if (referencedNodeIds.has(loadId)) continue;
+    delete apiPrompt[loadId];
+    removedNodeIds.push(loadId);
+  }
+
+  return { apiPrompt, removedNodeIds, disconnectedInputs };
+}
+
 module.exports = {
   applyNodeInputOverrides,
   parseSetArgs,
   resolveTagOverrides,
   coerceValue,
   randomizeSeeds,
+  pruneOptionalBflImageInputs,
 };
