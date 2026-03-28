@@ -146,45 +146,51 @@ function resolveTagOverrides(apiPrompt, setArgs) {
  * JavaScript can safely represent integers up to 2^53 - 1 (Number.MAX_SAFE_INTEGER).
  * We use that range to avoid precision issues.
  *
- * Scans every node's inputs for keys named "seed" with a numeric value
- * and replaces them with a cryptographically random value.
+ * Scans every node's inputs for supported seed keys with numeric values
+ * and replaces them with a random value.
  *
- * Skips nodes whose seed was explicitly set via overrides (pass appliedOverrides
+ * Supported keys currently include: "seed" and "noise_seed".
+ *
+ * Skips keys that were explicitly set via overrides (pass appliedOverrides
  * to preserve user intent).
  *
  * Returns the list of randomized entries for logging.
  */
 function randomizeSeeds(apiPrompt, appliedOverrides) {
   const randomized = [];
-  const overriddenSeeds = new Set();
+  const overriddenSeedKeys = new Set();
+  const randomizableSeedKeys = ['seed', 'noise_seed'];
 
-  // Build set of nodeId keys that had seed explicitly overridden
+  // Build set of nodeId/key pairs that had seed explicitly overridden.
   if (appliedOverrides) {
     for (const entry of appliedOverrides) {
-      if (entry.key === 'seed') {
-        overriddenSeeds.add(entry.nodeId);
+      if (randomizableSeedKeys.includes(entry.key)) {
+        overriddenSeedKeys.add(`${entry.nodeId}:${entry.key}`);
       }
     }
   }
 
   for (const [nodeId, node] of Object.entries(apiPrompt)) {
     if (!node?.inputs || typeof node.inputs !== 'object') continue;
-    if (!('seed' in node.inputs)) continue;
-    if (typeof node.inputs.seed !== 'number') continue;
+    for (const key of randomizableSeedKeys) {
+      if (!(key in node.inputs)) continue;
+      if (typeof node.inputs[key] !== 'number') continue;
 
-    // Skip if user explicitly set this seed via --set
-    if (overriddenSeeds.has(nodeId)) continue;
+      // Skip if user explicitly set this seed key via --set.
+      if (overriddenSeedKeys.has(`${nodeId}:${key}`)) continue;
 
-    const newSeed = Math.floor(Math.random() * Number.MAX_SAFE_INTEGER);
-    const oldSeed = node.inputs.seed;
-    node.inputs.seed = newSeed;
-    randomized.push({
-      nodeId,
-      title: node._meta?.title || null,
-      classType: node.class_type || null,
-      oldSeed,
-      newSeed,
-    });
+      const newSeed = Math.floor(Math.random() * Number.MAX_SAFE_INTEGER);
+      const oldSeed = node.inputs[key];
+      node.inputs[key] = newSeed;
+      randomized.push({
+        nodeId,
+        key,
+        title: node._meta?.title || null,
+        classType: node.class_type || null,
+        oldSeed,
+        newSeed,
+      });
+    }
   }
 
   return randomized;

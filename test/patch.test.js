@@ -5,6 +5,7 @@ const {
   parseSetArgs,
   resolveTagOverrides,
   applyNodeInputOverrides,
+  randomizeSeeds,
   pruneOptionalBflImageInputs,
 } = require('../patch');
 
@@ -204,6 +205,46 @@ describe('applyNodeInputOverrides', () => {
     const { applied, skipped } = applyNodeInputOverrides(prompt, {});
     assert.strictEqual(applied.length, 0);
     assert.strictEqual(skipped.length, 0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// randomizeSeeds
+// ---------------------------------------------------------------------------
+describe('randomizeSeeds', () => {
+  it('randomizes both seed and noise_seed keys', () => {
+    const prompt = {
+      '1': { inputs: { seed: 123 }, class_type: 'KSampler' },
+      '2': { inputs: { noise_seed: 456 }, class_type: 'RandomNoise' },
+      '3': { inputs: { steps: 20 }, class_type: 'Scheduler' },
+    };
+
+    const randomized = randomizeSeeds(prompt, []);
+
+    assert.equal(randomized.length, 2);
+    assert.ok(randomized.some((r) => r.nodeId === '1' && r.key === 'seed'));
+    assert.ok(randomized.some((r) => r.nodeId === '2' && r.key === 'noise_seed'));
+    assert.notEqual(prompt['1'].inputs.seed, 123);
+    assert.notEqual(prompt['2'].inputs.noise_seed, 456);
+    assert.equal(typeof prompt['1'].inputs.seed, 'number');
+    assert.equal(typeof prompt['2'].inputs.noise_seed, 'number');
+  });
+
+  it('skips seed keys that were explicitly overridden', () => {
+    const prompt = {
+      '1': { inputs: { seed: 111 } },
+      '2': { inputs: { noise_seed: 222 } },
+    };
+
+    const appliedOverrides = [
+      { nodeId: '1', key: 'seed', value: 999 },
+      { nodeId: '2', key: 'noise_seed', value: 888 },
+    ];
+
+    const randomized = randomizeSeeds(prompt, appliedOverrides);
+    assert.equal(randomized.length, 0);
+    assert.equal(prompt['1'].inputs.seed, 111);
+    assert.equal(prompt['2'].inputs.noise_seed, 222);
   });
 });
 
