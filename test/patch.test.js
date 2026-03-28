@@ -134,6 +134,33 @@ describe('resolveTagOverrides', () => {
     assert.deepStrictEqual(result, { '6': { text: 'hi' }, '3': { seed: 99 } });
   });
 
+  it('maps @prompt.text to value when tagged node uses value', () => {
+    const promptValueNode = {
+      '6': { inputs: { value: 'old' }, _meta: { title: '@prompt' } },
+    };
+
+    const result = resolveTagOverrides(promptValueNode, ['@prompt.text=hello']);
+    assert.deepStrictEqual(result, { '6': { value: 'hello' } });
+  });
+
+  it('maps @prompt.value to text when tagged node uses text', () => {
+    const promptTextNode = {
+      '6': { inputs: { text: 'old' }, _meta: { title: '@prompt' } },
+    };
+
+    const result = resolveTagOverrides(promptTextNode, ['@prompt.value=hello']);
+    assert.deepStrictEqual(result, { '6': { text: 'hello' } });
+  });
+
+  it('maps @negative.text to value when tagged node uses value', () => {
+    const negativeValueNode = {
+      '7': { inputs: { value: 'none' }, _meta: { title: '@negative' } },
+    };
+
+    const result = resolveTagOverrides(negativeValueNode, ['@negative.text=blurry']);
+    assert.deepStrictEqual(result, { '7': { value: 'blurry' } });
+  });
+
   it('throws when tag not found', () => {
     assert.throws(() => resolveTagOverrides(prompt, ['@missing.key=val']), /not found in workflow/);
   });

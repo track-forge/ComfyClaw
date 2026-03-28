@@ -22,6 +22,20 @@ function coerceValue(raw) {
   return raw;
 }
 
+function resolveTagInputAlias(node, tag, key) {
+  if (!node?.inputs || typeof node.inputs !== 'object') return key;
+  if (key in node.inputs) return key;
+
+  // Normalize prompt-like tags so callers can use either .text or .value.
+  const promptLikeTags = new Set(['@prompt', '@negative']);
+  if (!promptLikeTags.has(tag)) return key;
+
+  if (key === 'text' && 'value' in node.inputs) return 'value';
+  if (key === 'value' && 'text' in node.inputs) return 'text';
+
+  return key;
+}
+
 /**
  * Apply overrides to an API prompt.
  *
@@ -127,6 +141,13 @@ function resolveTagOverrides(apiPrompt, setArgs) {
         throw new Error(`Tag "${tag}" is ambiguous: matched nodes [${matches.join(', ')}]. Each @tag must be unique.`);
       }
       nodeId = matches[0];
+
+      // For prompt-like tags, allow user-friendly aliases (text <-> value).
+      const node = apiPrompt[nodeId];
+      const resolvedKey = resolveTagInputAlias(node, tag, key);
+      overrides[nodeId] ||= {};
+      overrides[nodeId][resolvedKey] = coerceValue(raw);
+      continue;
     } else {
       // Node-id based (passthrough)
       nodeId = prefix;
