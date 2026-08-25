@@ -6,7 +6,7 @@
 //   node cli.js --list
 //   node cli.js --describe <workflow>
 //   node cli.js --metadata <workflow>
-//   node cli.js --run <workflow> [outDir] [--set @tag.key=value ...]
+//   node cli.js --run <workflow> [outDir] [--set @tag.key=value ...] [--file @tag.key=/path ...]
 
 const fs = require('node:fs');
 const path = require('node:path');
@@ -19,6 +19,8 @@ const {
     pruneOptionalBflImageInputs,
 } = require('./patch');
 const { getServerWithLowestQueue } = require('./helpers');
+const { collectOutputDescriptors, makeSafeLocalOutputPath } = require('./outputs');
+const { parseRunArgs, prepareUploadFile, uploadResponseToInputValue } = require('./run-args');
 const ComfyUI = require('./comfy');
 const config = require('./config');
 const inventory = require('./inventory');
@@ -61,7 +63,24 @@ async function uploadToS3(filePath, buf) {
     if (!s3) return null;
 
     const ext = path.extname(filePath).slice(1);
-    const mimeTypes = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', mp4: 'video/mp4', gif: 'image/gif' };
+    const mimeTypes = {
+        png: 'image/png',
+        jpg: 'image/jpeg',
+        jpeg: 'image/jpeg',
+        webp: 'image/webp',
+        bmp: 'image/bmp',
+        tif: 'image/tiff',
+        tiff: 'image/tiff',
+        mp4: 'video/mp4',
+        gif: 'image/gif',
+        flac: 'audio/flac',
+        mp3: 'audio/mpeg',
+        ogg: 'audio/ogg',
+        opus: 'audio/opus',
+        wav: 'audio/wav',
+        m4a: 'audio/mp4',
+        aac: 'audio/aac',
+    };
     const contentType = mimeTypes[ext] || 'application/octet-stream';
     const key = `${config.aws.prefix || ''}${path.basename(filePath)}`;
 
@@ -173,6 +192,54 @@ async function getServerURL() {
         if (!res.allServersDown && res.serverToUse) return res.serverToUse;
     } catch { /* ignore */ }
     return null;
+}
+
+function createRunCompletionGate({ resolve, reject, cleanup, markFinished = () => {} }) {
+    let settled = false;
+    let executionSucceeded = false;
+    const pendingTasks = new Set();
+
+    const settle = (fn, value) => {
+        if (settled) return;
+        settled = true;
+        markFinished();
+        cleanup();
+        fn(value);
+    };
+
+    const rejectDone = (err) => {
+        settle(reject, err);
+    };
+
+    const maybeResolveDone = () => {
+        if (executionSucceeded && pendingTasks.size === 0) {
+            settle(resolve);
+        }
+    };
+
+    return {
+        addTask(task) {
+            if (settled) return;
+            pendingTasks.add(task);
+            Promise.resolve(task)
+                .catch(rejectDone)
+                .finally(() => {
+                    pendingTasks.delete(task);
+                    maybeResolveDone();
+                });
+        },
+        markExecutionSuccess() {
+            executionSucceeded = true;
+            maybeResolveDone();
+        },
+        reject: rejectDone,
+        isSettled() {
+            return settled;
+        },
+        pendingCount() {
+            return pendingTasks.size;
+        },
+    };
 }
 
 function cmdMetadata(name) {
@@ -290,36 +357,43 @@ async function cmdDescribe(name) {
 async function cmdRun(name, argv) {
     if (!name) {
         console.error('Error: --run requires a workflow name.');
-        console.error('Usage: node cli.js --run <workflow> [outDir] [--set @tag.key=value ...]');
+        console.error('Usage: node cli.js --run <workflow> [outDir] [--set @tag.key=value ...] [--file @tag.key=/path ...]');
         console.error('Run "node cli.js --list" to see available workflows.');
         process.exit(2);
     }
 
-    // Parse remaining argv: [outDir] [--set key=val ...]
     const baseDir = process.env.COMFYCLAW_DIR || __dirname;
-    let outDir = path.join(baseDir, 'outputs');
-    const setArgs = [];
-    let i = 0;
-
-    // First non-flag arg after name is outDir
-    if (argv[0] && !argv[0].startsWith('--')) {
-        outDir = argv[0];
-        i = 1;
-    }
-
-    for (; i < argv.length; i++) {
-        if (argv[i] === '--set') {
-            if (!argv[i + 1]) throw new Error('Missing value for --set');
-            setArgs.push(argv[i + 1]);
-            i++;
-        }
-    }
+    const { outDir, setArgs, fileArgs } = parseRunArgs(argv, { baseDir });
 
     fs.mkdirSync(outDir, { recursive: true });
 
     const { prompt: apiPrompt } = loadWorkflow(name);
 
-    // Resolve tag-based + node-id overrides
+    // Server selection happens before uploads so --file targets the same server that runs the prompt.
+    const envServer = process.env.COMFYUI_SERVER;
+    let serverToUse = envServer || null;
+
+    if (!serverToUse) {
+        const res = await getServerWithLowestQueue();
+        if (res.allServersDown || !res.serverToUse) {
+            throw new Error('All ComfyUI servers unavailable (see logs above).');
+        }
+        serverToUse = res.serverToUse;
+    }
+
+    if (fileArgs.length) {
+        const uploader = Object.create(ComfyUI.prototype);
+        uploader.comfyUIServerURL = serverToUse;
+        for (const arg of fileArgs) {
+            const upload = prepareUploadFile(arg);
+            const response = await uploader.uploadFile(upload);
+            const inputValue = uploadResponseToInputValue(response);
+            setArgs.push(`${upload.left}=${inputValue}`);
+            console.log(`Uploaded file for ${upload.left}: ${inputValue}`);
+        }
+    }
+
+    // Resolve tag-based + node-id overrides, including uploaded file values.
     const overrides = resolveTagOverrides(apiPrompt, setArgs);
     const { applied, skipped } = applyNodeInputOverrides(apiPrompt, overrides);
 
@@ -354,18 +428,6 @@ async function cmdRun(name, argv) {
         });
     }
 
-    // Server selection
-    const envServer = process.env.COMFYUI_SERVER;
-    let serverToUse = envServer || null;
-
-    if (!serverToUse) {
-        const res = await getServerWithLowestQueue();
-        if (res.allServersDown || !res.serverToUse) {
-            throw new Error('All ComfyUI servers unavailable (see logs above).');
-        }
-        serverToUse = res.serverToUse;
-    }
-
     // Detect save nodes
     const saveNodes = Object.keys(apiPrompt).filter(
         (k) => apiPrompt[k]?._meta?.title === 'Save'
@@ -373,6 +435,9 @@ async function cmdRun(name, argv) {
             || apiPrompt[k]?._meta?.title === 'SaveVideo'
             || apiPrompt[k]?.class_type === 'SaveImage'
             || apiPrompt[k]?.class_type === 'SaveAudio'
+            || apiPrompt[k]?.class_type === 'SaveAudioMP3'
+            || apiPrompt[k]?.class_type === 'SaveAudioOpus'
+            || apiPrompt[k]?.class_type === 'SaveAudioAdvanced'
             || apiPrompt[k]?.class_type === 'VHS_VideoCombine',
     );
 
@@ -382,6 +447,7 @@ async function cmdRun(name, argv) {
 
     let finished = false;
     const downloaded = [];
+    const seenOutputPaths = new Map();
     let comfy = null;
     let timeoutId = null;
 
@@ -392,30 +458,27 @@ async function cmdRun(name, argv) {
             if (comfy) comfy.disconnect();
             comfy = null;
         };
-
-        const resolveDone = () => {
-            finished = true;
-            cleanup();
-            resolve();
-        };
-
-        const rejectDone = (err) => {
-            finished = true;
-            cleanup();
-            reject(err);
-        };
+        const completion = createRunCompletionGate({
+            resolve,
+            reject,
+            cleanup,
+            markFinished: () => { finished = true; },
+        });
 
         comfy = new ComfyUI({
             comfyUIServerURL: serverToUse,
             nodes: { api_save: saveNodes },
 
-            onSaveCallback: async ({ message, promptId }) => {
-                try {
-                    // TODO: SaveAudio Handler
-                    const files = (message?.data?.output?.images || []).concat(message?.data?.output?.gifs || []);
+            onSaveCallback: ({ message, promptId }) => {
+                completion.addTask((async () => {
+                    const files = collectOutputDescriptors(message?.data?.output);
                     for (const file of files) {
-                        const buf = await comfy.getFile(file);
-                        const outPath = path.join(outDir, `${promptId}-${file.filename}`);
+                        const currentComfy = comfy;
+                        if (!currentComfy) {
+                            throw new Error('ComfyUI connection closed before output download completed.');
+                        }
+                        const buf = await currentComfy.getFile(file);
+                        const outPath = makeSafeLocalOutputPath(outDir, promptId, file, seenOutputPaths);
                         fs.writeFileSync(outPath, buf);
                         downloaded.push(outPath);
                         console.log(`Saved: ${outPath} (${buf.length} bytes)`);
@@ -425,17 +488,15 @@ async function cmdRun(name, argv) {
                             await uploadToS3(outPath, buf);
                         }
                     }
-                } catch (e) {
-                    rejectDone(e);
-                }
+                })());
             },
 
             onMessageCallback: async ({ message }) => {
                 if (message?.type === 'execution_error') {
-                    rejectDone(new Error(message?.data?.exception_message || 'Execution error'));
+                    completion.reject(new Error(message?.data?.exception_message || 'Execution error'));
                 }
                 if (message?.type === 'execution_success') {
-                    resolveDone();
+                    completion.markExecutionSuccess();
                 }
             },
 
@@ -443,19 +504,19 @@ async function cmdRun(name, argv) {
                 try {
                     await self.queue({ workflowDataAPI: apiPrompt });
                 } catch (e) {
-                    rejectDone(e);
+                    completion.reject(e);
                 }
             },
 
             onErrorCallback: async (err) => {
-                rejectDone(err);
+                completion.reject(err);
             },
         });
 
         // Safety timeout
         timeoutId = setTimeout(() => {
             if (!finished) {
-                rejectDone(new Error('Timed out waiting for workflow to finish.'));
+                completion.reject(new Error('Timed out waiting for workflow to finish.'));
             }
         }, Number(process.env.COMFYUI_TIMEOUT_MS || 180000));
     });
@@ -619,11 +680,13 @@ function printUsage() {
     console.log('  node cli.js --list                              List available workflows');
     console.log('  node cli.js --describe <workflow>               Show editable @tag parameters');
     console.log('  node cli.js --metadata <workflow>               Print workflow metadata JSON');
-    console.log('  node cli.js --run <workflow> [outDir] [--set]   Run a workflow');
+    console.log('  node cli.js --run <workflow> [outDir] [--set] [--file]   Run a workflow');
     console.log('  node cli.js --inventory <subcommand>            Manage models, LoRAs, VAEs\n');
     console.log('Override parameters:');
     console.log('  --set @tag.key=value     Tag-based override (recommended)');
-    console.log('  --set nodeId.key=value   Direct node-ID override\n');
+    console.log('  --set nodeId.key=value   Direct node-ID override');
+    console.log('  --file @tag.key=/path    Upload image/audio file, then set uploaded filename');
+    console.log('  --file nodeId.key=/path  Direct node-ID file upload\n');
     console.log('Inventory subcommands:');
     console.log('  pull                     Fetch available assets from ComfyUI server');
     console.log('  list [type]              List assets (summary or by type)');
@@ -662,7 +725,14 @@ async function main() {
     }
 }
 
-main().catch((err) => {
-    console.error(`Error: ${err.message}`);
-    process.exit(1);
-});
+if (require.main === module) {
+    main().catch((err) => {
+        console.error(`Error: ${err.message}`);
+        process.exit(1);
+    });
+}
+
+module.exports = {
+    cmdRun,
+    createRunCompletionGate,
+};

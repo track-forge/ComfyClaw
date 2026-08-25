@@ -1,6 +1,6 @@
 ---
 name: comfyclaw
-description: Run ComfyUI workflows via CLI. Use --list to discover workflows, --describe to see editable parameters, --metadata to fetch companion metadata JSON, and --run to execute with --set @tag overrides. No need to read workflow files directly.
+description: Run ComfyUI workflows via CLI. Use --list to discover workflows, --describe to see editable parameters, --metadata to fetch companion metadata JSON, and --run to execute with --set @tag overrides or --file uploads. No need to read workflow files directly.
 ---
 
 # ComfyClaw Skill
@@ -25,7 +25,7 @@ node cli.js --describe <workflow>
 node cli.js --metadata <workflow>
 
 # Run a workflow with overrides
-node cli.js --run <workflow> [outDir] --set @tag.key=value ...
+node cli.js --run <workflow> [outDir] --set @tag.key=value ... --file @tag.key=/path ...
 ```
 
 ---
@@ -91,7 +91,7 @@ Use this metadata to:
 ## 3. Run a Workflow (`--run`)
 
 ```bash
-node cli.js --run <workflow> [outDir] [--set @tag.key=value ...]
+node cli.js --run <workflow> [outDir] [--set @tag.key=value ...] [--file @tag.key=/path ...]
 ```
 
 ### Override syntax
@@ -108,6 +108,13 @@ Node-ID based (for workflows without @tags):
 --set 6.text="a beautiful sunset"
 --set 3.steps=30
 ```
+
+Upload local image/audio inputs through ComfyUI before queueing:
+```bash
+--file @image.image=./input.png
+--file 12.audio=./input.flac
+```
+Supported uploads include PNG/JPEG/WebP/GIF/BMP/TIFF images and WAV/MP3/FLAC/OGG/Opus/M4A/AAC audio. Outputs include image, GIF/video, and audio descriptors from ComfyUI save nodes.
 
 ### Full example
 
@@ -164,7 +171,7 @@ When adding a new ComfyUI workflow to the repo:
 1. **Export as API format** from ComfyUI ("Save (API Format)")
 2. **Name:** `workflows/<name>-api.json`
 3. **Tag nodes** with `@tags` in `_meta.title`:
-   - **Required:** `@save` (on the SaveImage node — output detection depends on this)
+   - **Required:** `@save` (on the SaveImage, SaveAudio, or video save node — output detection depends on this)
    - **Recommended:** `@prompt`, `@negative`, `@ksampler`, `@checkpoint`, `@lora`, `@size`
 4. **Each `@tag` must be unique** within a workflow (no duplicates)
 
@@ -172,7 +179,7 @@ When adding a new ComfyUI workflow to the repo:
 
 | Tag | Node Type | Purpose |
 |-----|-----------|---------|
-| `@save` | SaveImage | **Required.** Output file detection |
+| `@save` | SaveImage / SaveAudio / VHS_VideoCombine | **Required.** Output file detection |
 | `@prompt` | CLIPTextEncode | Positive prompt override |
 | `@negative` | CLIPTextEncode | Negative prompt override |
 | `@ksampler` | KSampler / KSamplerAdvanced | Sampler controls (seed, steps, cfg) |

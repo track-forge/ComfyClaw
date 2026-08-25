@@ -110,9 +110,9 @@ Prints companion metadata JSON for the selected workflow (for agent/context guid
 node cli.js --metadata text2image-example
 ```
 
-### `--run <workflow> [outDir] [--set ...]`
+### `--run <workflow> [outDir] [--set ...] [--file ...]`
 
-Executes a workflow on a ComfyUI server, downloads output files.
+Executes a workflow on a ComfyUI server, uploads local image/audio inputs, and downloads output files.
 
 ```bash
 node cli.js --run text2image-example outputs \
@@ -123,10 +123,24 @@ node cli.js --run text2image-example outputs \
 ```
 
 **What happens:**
-1. Loads workflow, applies `--set` overrides
-2. Connects to a ComfyUI server (auto-selects lowest queue)
-3. Queues the prompt and waits via WebSocket
-4. Downloads output files to `outDir`
+1. Loads workflow and selects a ComfyUI server
+2. Uploads each `--file` image/audio input and applies the returned server filename through the same override path as `--set`
+3. Applies `--set` overrides
+4. Queues the prompt and waits via WebSocket
+5. Downloads image, GIF/video, and audio outputs to `outDir`
+
+Upload examples:
+
+```bash
+node cli.js --run image-to-image outputs \
+  --file @image.image=./input.png \
+  --set @prompt.text="restore this portrait"
+
+node cli.js --run audio-workflow outputs \
+  --file @audio.audio=./input.flac
+```
+
+Supported upload extensions: `.png`, `.jpg`, `.jpeg`, `.webp`, `.gif`, `.bmp`, `.tif`, `.tiff`, `.wav`, `.mp3`, `.flac`, `.ogg`, `.opus`, `.m4a`, `.aac`. Unsupported file types fail before queueing. Downloaded files keep the `<promptId>-<filename>` prefix, and local name collisions receive a deterministic numeric suffix.
 
 ---
 
@@ -170,7 +184,7 @@ Common tags:
 | `@ksampler` | KSampler | `seed`, `steps`, `cfg`, `sampler_name`, `scheduler`, `denoise` |
 | `@size` | EmptyLatentImage | `width`, `height` |
 | `@checkpoint` | CheckpointLoaderSimple | `ckpt_name` |
-| `@save` | SaveImage / VHS_VideoCombine | `filename_prefix` |
+| `@save` | SaveImage / SaveAudio / VHS_VideoCombine | `filename_prefix` |
 
 Each `@tag` must be unique within a workflow.
 
