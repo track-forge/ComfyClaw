@@ -3,6 +3,7 @@
 
 const WebSocket = require('ws');
 const crypto = require('node:crypto');
+const fs = require('node:fs');
 const url = require('node:url');
 
 class ComfyUI {
@@ -418,6 +419,37 @@ class ComfyUI {
         reject(err);
       }
     });
+  }
+
+  async uploadFile({ localPath, basename, contentType }) {
+    const data = new FormData();
+    const bytes = fs.readFileSync(localPath);
+    const blob = new Blob([bytes], { type: contentType });
+    data.append('image', blob, basename);
+    data.append('type', 'input');
+    data.append('overwrite', 'false');
+
+    const response = await fetch(`${this.comfyUIServerURL}/upload/image`, {
+      method: 'POST',
+      body: data,
+    });
+
+    let responseData = null;
+    const responseText = await response.text();
+    if (responseText) {
+      try {
+        responseData = JSON.parse(responseText);
+      } catch {
+        if (response.ok) throw new Error(`ComfyUI upload returned non-JSON response: ${responseText}`);
+      }
+    }
+
+    if (!response.ok) {
+      const detail = responseData ? JSON.stringify(responseData) : responseText;
+      throw new Error(`ComfyUI upload failed (HTTP ${response.status}): ${detail || response.statusText}`);
+    }
+
+    return responseData;
   }
 
   getFile({ filename, subfolder, type }) {
