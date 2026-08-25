@@ -194,6 +194,54 @@ async function getServerURL() {
     return null;
 }
 
+function createRunCompletionGate({ resolve, reject, cleanup, markFinished = () => {} }) {
+    let settled = false;
+    let executionSucceeded = false;
+    const pendingTasks = new Set();
+
+    const settle = (fn, value) => {
+        if (settled) return;
+        settled = true;
+        markFinished();
+        cleanup();
+        fn(value);
+    };
+
+    const rejectDone = (err) => {
+        settle(reject, err);
+    };
+
+    const maybeResolveDone = () => {
+        if (executionSucceeded && pendingTasks.size === 0) {
+            settle(resolve);
+        }
+    };
+
+    return {
+        addTask(task) {
+            if (settled) return;
+            pendingTasks.add(task);
+            Promise.resolve(task)
+                .catch(rejectDone)
+                .finally(() => {
+                    pendingTasks.delete(task);
+                    maybeResolveDone();
+                });
+        },
+        markExecutionSuccess() {
+            executionSucceeded = true;
+            maybeResolveDone();
+        },
+        reject: rejectDone,
+        isSettled() {
+            return settled;
+        },
+        pendingCount() {
+            return pendingTasks.size;
+        },
+    };
+}
+
 function cmdMetadata(name) {
     if (!name) {
         console.error('Error: --metadata requires a workflow name.');
@@ -410,28 +458,26 @@ async function cmdRun(name, argv) {
             if (comfy) comfy.disconnect();
             comfy = null;
         };
-
-        const resolveDone = () => {
-            finished = true;
-            cleanup();
-            resolve();
-        };
-
-        const rejectDone = (err) => {
-            finished = true;
-            cleanup();
-            reject(err);
-        };
+        const completion = createRunCompletionGate({
+            resolve,
+            reject,
+            cleanup,
+            markFinished: () => { finished = true; },
+        });
 
         comfy = new ComfyUI({
             comfyUIServerURL: serverToUse,
             nodes: { api_save: saveNodes },
 
-            onSaveCallback: async ({ message, promptId }) => {
-                try {
+            onSaveCallback: ({ message, promptId }) => {
+                completion.addTask((async () => {
                     const files = collectOutputDescriptors(message?.data?.output);
                     for (const file of files) {
-                        const buf = await comfy.getFile(file);
+                        const currentComfy = comfy;
+                        if (!currentComfy) {
+                            throw new Error('ComfyUI connection closed before output download completed.');
+                        }
+                        const buf = await currentComfy.getFile(file);
                         const outPath = makeSafeLocalOutputPath(outDir, promptId, file, seenOutputPaths);
                         fs.writeFileSync(outPath, buf);
                         downloaded.push(outPath);
@@ -442,17 +488,15 @@ async function cmdRun(name, argv) {
                             await uploadToS3(outPath, buf);
                         }
                     }
-                } catch (e) {
-                    rejectDone(e);
-                }
+                })());
             },
 
             onMessageCallback: async ({ message }) => {
                 if (message?.type === 'execution_error') {
-                    rejectDone(new Error(message?.data?.exception_message || 'Execution error'));
+                    completion.reject(new Error(message?.data?.exception_message || 'Execution error'));
                 }
                 if (message?.type === 'execution_success') {
-                    resolveDone();
+                    completion.markExecutionSuccess();
                 }
             },
 
@@ -460,19 +504,19 @@ async function cmdRun(name, argv) {
                 try {
                     await self.queue({ workflowDataAPI: apiPrompt });
                 } catch (e) {
-                    rejectDone(e);
+                    completion.reject(e);
                 }
             },
 
             onErrorCallback: async (err) => {
-                rejectDone(err);
+                completion.reject(err);
             },
         });
 
         // Safety timeout
         timeoutId = setTimeout(() => {
             if (!finished) {
-                rejectDone(new Error('Timed out waiting for workflow to finish.'));
+                completion.reject(new Error('Timed out waiting for workflow to finish.'));
             }
         }, Number(process.env.COMFYUI_TIMEOUT_MS || 180000));
     });
@@ -681,7 +725,14 @@ async function main() {
     }
 }
 
-main().catch((err) => {
-    console.error(`Error: ${err.message}`);
-    process.exit(1);
-});
+if (require.main === module) {
+    main().catch((err) => {
+        console.error(`Error: ${err.message}`);
+        process.exit(1);
+    });
+}
+
+module.exports = {
+    cmdRun,
+    createRunCompletionGate,
+};
